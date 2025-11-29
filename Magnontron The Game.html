@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ik zie ik zie Manon eet brie</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap'); /* Hacker font */
+        
+        body {
+            font-family: 'Fredoka', sans-serif;
+            background-color: #f3f4f6;
+            transition: background-color 0.5s ease, transform 0.5s ease, filter 0.5s ease;
+            overflow: hidden; /* Prevent scroll */
+            touch-action: none; /* Better tapping on mobile */
+            overscroll-behavior: none; /* Prevent pull-to-refresh on mobile */
+        }
+
+        /* Use dvh (dynamic viewport height) for better mobile support with address bars */
+        .screen { 
+            display: none; 
+            height: 100vh; 
+            height: 100dvh; 
+            width: 100vw; 
+            flex-direction: column; 
+            justify-content: center; 
+            align-items: center; 
+            position: relative; 
+        }
+        .screen.active { display: flex; }
+
+        /* Floating wrong guesses */
+        .floating-word {
+            position: absolute;
+            font-weight: bold;
+            color: rgba(0,0,0,0.6);
+            font-size: 1.2rem;
+            animation: popIn 0.3s ease-out;
+            pointer-events: none;
+            background: rgba(255,255,255,0.8);
+            padding: 4px 8px;
+            border-radius: 4px;
+            z-index: 0;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            80% { transform: scale(1.2); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Cheese Loader */
+        .cheese-spinner {
+            font-size: 3rem;
+            animation: spin 2s infinite linear;
+        }
+        @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        .game-input {
+            border: 2px solid #fbbf24; 
+            outline: none;
+            transition: all 0.2s;
+            -webkit-appearance: none; /* Remove iOS default styles */
+        }
+        .game-input:focus {
+            border-color: #d97706;
+            box-shadow: 0 0 10px rgba(217, 119, 6, 0.3);
+        }
+
+        .btn-primary {
+            background-color: #fbbf24;
+            color: #78350f;
+            font-weight: bold;
+            transition: transform 0.1s;
+            touch-action: manipulation; /* Improves touch response */
+        }
+        .btn-primary:active { transform: scale(0.95); }
+
+        /* --- TROLL EFFECTS CSS --- */
+        .troll-disco { animation: disco 0.5s infinite; }
+        @keyframes disco {
+            0% { filter: hue-rotate(0deg) invert(0); }
+            50% { filter: hue-rotate(180deg) invert(1); }
+            100% { filter: hue-rotate(360deg) invert(0); }
+        }
+        .troll-australia { transform: rotate(180deg); }
+        .troll-tiny { transform: scale(0.2); }
+
+        /* --- SHAKE EFFECTS --- */
+        .shake-soft { animation: shake 0.5s; }
+        .shake-hard { animation: shake 0.5s infinite; }
+        @keyframes shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-1px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+        /* --- CHEESE CONFETTI --- */
+        .cheese-confetti {
+            position: fixed;
+            top: -50px;
+            font-size: 2rem;
+            z-index: 100;
+            pointer-events: none;
+            animation: fall linear forwards;
+        }
+        @keyframes fall {
+            to { transform: translateY(110vh) rotate(720deg); }
+        }
+
+        /* Cheat Menu Styles */
+        .cheat-overlay {
+            background: rgba(0, 0, 0, 0.85);
+            font-family: 'VT323', monospace;
+            color: #0f0;
+            text-shadow: 0 0 5px #0f0;
+        }
+        .cheat-btn {
+            border: 1px solid #0f0;
+            background: rgba(0, 255, 0, 0.1);
+            color: #0f0;
+            padding: 8px;
+            margin: 4px;
+            font-family: 'VT323', monospace;
+            font-size: 1.2rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .cheat-btn:hover { background: #0f0; color: #000; }
+        .cheat-input {
+            background: black;
+            border: 1px solid #0f0;
+            color: #0f0;
+            font-family: 'VT323', monospace;
+            padding: 5px;
+        }
+
+        /* --- PANIEK OP DE DIJK CSS --- */
+        .dike-bg {
+            background-image: repeating-linear-gradient(45deg, #b45309 25%, #92400e 25%, #92400e 50%, #b45309 50%, #b45309 75%, #92400e 75%, #92400e 100%);
+            background-size: 40px 40px;
+        }
+        .water-bg {
+            background-color: #3b82f6;
+            background-image: radial-gradient(#60a5fa 2px, transparent 2px);
+            background-size: 20px 20px;
+        }
+        .dike-hole {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: radial-gradient(circle, #2563eb 40%, #1e40af 100%);
+            border-radius: 50%;
+            border: 4px solid #93c5fd;
+            box-shadow: 0 0 15px #3b82f6;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            animation: pulseWater 0.5s infinite alternate;
+            cursor: pointer;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        @keyframes pulseWater { from { transform: scale(1); } to { transform: scale(1.1); } }
+        
+        .role-badge {
+            position: absolute;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-weight: bold;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+            z-index: 50;
+        }
+
+        /* Commentary Animation */
+        .comment-pop {
+            animation: commentPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes commentPop {
+            0% { transform: scale(0.5) translateY(20px); opacity: 0; }
+            100% { transform: scale(1) translateY(0); opacity: 1; }
+        }
+
+    </style>
+</head>
+<body>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg z-50 hidden transition-opacity duration-300">
+        <span id="toast-msg">Melding</span>
+    </div>
+
+    <!-- CHEAT MENU MODAL -->
+    <div id="cheat-menu" class="fixed inset-0 cheat-overlay z-[100] hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-black border-2 border-green-500 p-6 rounded shadow-[0_0_20px_#0f0] w-full max-w-lg overflow-y-auto max-h-[90vh]">
+            <h2 class="text-4xl text-center mb-4 border-b border-green-500 pb-2">HACKER MENU_</h2>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="col-span-2">
+                    <p class="mb-1 text-sm opacity-70">>> SELF HELP</p>
+                    <button id="btn-cheat-reveal" class="cheat-btn w-full">REVEAL SOLUTION</button>
+                    <button id="btn-cheat-hint" class="cheat-btn w-full">FORCE 1st LETTER</button>
+                </div>
+                <div class="col-span-2 mt-4">
+                    <p class="mb-1 text-sm opacity-70">>> TROLL SEEKER (10 SECONDS)</p>
+                </div>
+                <button id="btn-cheat-disco" class="cheat-btn">DISCO PARTY</button>
+                <button id="btn-cheat-australia" class="cheat-btn">AUSTRALIA MODE</button>
+                <button id="btn-cheat-tiny" class="cheat-btn">ANT MODE</button>
+                <div class="col-span-2 flex gap-2 mt-2">
+                    <input id="inp-cheat-spam" type="text" class="cheat-input flex-1" placeholder="SPAM WORD...">
+                    <button id="btn-cheat-spam" class="cheat-btn">START SPAM</button>
+                </div>
+            </div>
+            <button onclick="document.getElementById('cheat-menu').classList.add('hidden')" class="text-red-500 hover:text-red-400 mt-4 text-center w-full underline">>> EXIT HACK_</button>
+        </div>
+    </div>
+
+    <!-- 1. AUTH / LOADING SCREEN -->
+    <div id="screen-loading" class="screen active bg-white p-6 text-center">
+        <div class="cheese-spinner mb-4">🧀</div>
+        <h2 class="text-xl font-bold text-gray-800 mb-2">Verbinden met server...</h2>
+        <p class="text-sm text-gray-600 mb-6" id="loading-text">Even geduld...</p>
+        
+        <!-- Error Container (Hidden by default) -->
+        <div id="loading-error" class="hidden bg-red-50 border border-red-200 rounded-lg p-4 text-left">
+            <h3 class="font-bold text-red-700 mb-2"><i class="fas fa-exclamation-triangle mr-2"></i>Verbindingsfout</h3>
+            <p class="text-sm text-red-600 mb-3" id="error-details">...</p>
+            <p class="text-xs text-gray-500 mb-4">
+                <strong>Tip:</strong> Als je dit bestand direct opent op je telefoon (content:// of file://), werkt multiplayer niet. Upload dit bestand naar een website (zoals Netlify Drop of Tiiny.host) en deel de link.
+            </p>
+            <button onclick="window.location.reload()" class="w-full bg-red-100 text-red-700 font-bold py-2 rounded hover:bg-red-200">
+                Probeer opnieuw
+            </button>
+        </div>
+    </div>
+
+    <!-- 2. LOGIN SCREEN -->
+    <div id="screen-login" class="screen overflow-y-auto">
+        <div class="w-full max-w-md p-4">
+            <h1 class="text-4xl font-bold text-yellow-600 mb-2 text-center">Ik zie ik zie... 👁️</h1>
+            <h2 class="text-xl text-yellow-800 mb-8 font-light text-center">Manon eet brie 🧀</h2>
+            
+            <div class="bg-white p-6 rounded-2xl shadow-xl w-full">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">Je naam</label>
+                    <input id="inp-name" type="text" class="game-input w-full p-3 rounded-lg bg-yellow-50" placeholder="Bijv. Manon">
+                </div>
+                <div class="flex gap-4 mb-4">
+                    <button id="btn-create-room" class="btn-primary flex-1 py-3 rounded-lg hover:bg-yellow-400">
+                        <i class="fas fa-plus mr-2"></i>Nieuwe Kamer
+                    </button>
+                </div>
+                <div class="relative flex py-2 items-center">
+                    <div class="flex-grow border-t border-gray-300"></div>
+                    <span class="flex-shrink mx-4 text-gray-400">of doe mee</span>
+                    <div class="flex-grow border-t border-gray-300"></div>
+                </div>
+                <div class="flex gap-2 mt-4">
+                    <input id="inp-room-code" type="text" class="game-input flex-1 p-3 rounded-lg bg-yellow-50 uppercase tracking-widest text-center" placeholder="CODE" maxlength="4">
+                    <button id="btn-join-room" class="bg-yellow-100 text-yellow-800 font-bold px-6 rounded-lg hover:bg-yellow-200">
+                        Join
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. LOBBY SCREEN -->
+    <div id="screen-lobby" class="screen bg-white overflow-y-auto">
+        <div class="w-full max-w-md p-4">
+            <div class="bg-yellow-50 p-6 rounded-2xl shadow-lg text-center w-full">
+                <h2 class="text-2xl font-bold text-yellow-800 mb-2">Lobby: <span id="lobby-code" class="font-mono text-3xl select-all cursor-pointer bg-white px-2 rounded border border-yellow-200">....</span></h2>
+                <p class="text-gray-500 text-sm mb-6">Deel deze code met je tegenspeler</p>
+
+                <div id="player-list" class="space-y-3 mb-8 text-left">
+                    <!-- Players injected here -->
+                </div>
+
+                <div id="waiting-msg" class="text-gray-400 animate-pulse bg-white p-3 rounded-lg border border-gray-200">
+                    Wachten op speler 2...
+                </div>
+
+                <!-- Host Controls -->
+                <div id="host-controls" class="hidden w-full border-t border-yellow-200 pt-4 text-left mt-4">
+                    
+                    <label class="block text-gray-700 text-sm font-bold mb-2">1. Spelmodus</label>
+                    <select id="sel-gamemode" class="game-input w-full p-2 rounded-lg bg-white cursor-pointer mb-4 h-12">
+                        <option value="classic">🎨 Klassiek (Ik zie ik zie)</option>
+                        <option value="dike">🌊 Paniek op de Dijk (Nieuw!)</option>
+                    </select>
+
+                    <label class="block text-gray-700 text-sm font-bold mb-2">2. Rollen</label>
+                    <div class="flex flex-col gap-1 mb-6">
+                         <select id="sel-seeker" class="game-input w-full p-2 rounded-lg bg-white cursor-pointer h-12">
+                            <!-- Options injected via JS -->
+                         </select>
+                         <p class="text-xs text-gray-400 mt-1">Kies wie begint als Zoeker / De Zee</p>
+                    </div>
+
+                    <button id="btn-start-game" class="btn-primary w-full py-4 rounded-lg text-lg shadow-md">
+                        Start Spel 🧀
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. SETUP SCREEN (SEEKER - Classic) -->
+    <div id="screen-setup" class="screen bg-yellow-50">
+        <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center mx-4">
+            <h2 class="text-2xl font-bold text-yellow-800 mb-2">Jij bent de Kiezer!</h2>
+            <p class="text-gray-600 mb-6">Kies een object uit je omgeving.</p>
+            <input id="inp-secret-word" type="text" class="game-input w-full p-3 rounded-lg mb-4 text-center text-lg" placeholder="Wat zie je? (het object)">
+            <label class="block text-gray-700 text-sm font-bold mb-2 text-left">Kies de kleur van dit object:</label>
+            <div class="flex items-center gap-4 mb-6">
+                <input id="inp-secret-color" type="color" class="h-16 w-full cursor-pointer rounded-lg border-2 border-gray-200 p-1" value="#fbbf24">
+            </div>
+            <button id="btn-confirm-setup" class="btn-primary w-full py-3 rounded-lg text-lg">Bevestigen</button>
+        </div>
+    </div>
+
+    <!-- 5. WAITING SCREEN -->
+    <div id="screen-waiting-setup" class="screen bg-gray-100">
+        <div class="text-center p-4">
+            <div class="cheese-spinner mb-4">👀</div>
+            <h2 id="waiting-title" class="text-xl font-bold text-gray-700">De tegenspeler kiest...</h2>
+            <p class="text-gray-500">Moment geduld a.u.b.</p>
+        </div>
+    </div>
+
+    <!-- 6. GAME SCREEN (GUESSER - Classic) -->
+    <div id="screen-game-guesser" class="screen transition-colors duration-500">
+        <div class="absolute inset-0 flex flex-col justify-center items-center p-4">
+            
+            <div class="bg-white/95 p-6 rounded-2xl shadow-2xl w-full max-w-lg backdrop-blur-sm border border-white/20">
+                <h3 class="text-center text-gray-800 font-bold mb-4">Raad het object met deze kleur!</h3>
+                
+                <div id="guesser-hint-box" class="hidden bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4 rounded" role="alert">
+                    <p class="font-bold">Hint:</p>
+                    <p id="guesser-hint-text">...</p>
+                </div>
+
+                <!-- DYNAMIC COMMENTARY BOX -->
+                <div id="dynamic-comment-container" class="mb-4 h-8 flex items-center justify-center">
+                    <span id="dynamic-comment" class="text-lg font-bold text-pink-600 italic text-center"></span>
+                </div>
+
+                <div class="flex gap-2">
+                    <input id="inp-guess" type="text" class="game-input flex-1 p-3 rounded-lg text-lg" placeholder="Wat is het?" autocomplete="off">
+                    <button id="btn-submit-guess" class="bg-green-500 text-white font-bold px-6 rounded-lg hover:bg-green-600 shadow-md active:bg-green-700"><i class="fas fa-check"></i></button>
+                </div>
+                
+                <div class="mt-4 flex justify-between items-center h-8">
+                    <span id="guess-feedback" class="text-red-500 font-bold"></span>
+                    <button id="btn-request-hint" class="text-blue-500 hover:text-blue-700 text-sm font-semibold underline p-2 rounded hover:bg-blue-50"><i class="far fa-lightbulb mr-1"></i>Hint vragen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 7. GAME SCREEN (SEEKER - Classic) -->
+    <div id="screen-game-seeker" class="screen bg-gray-50 overflow-hidden">
+        <div id="wrong-guesses-container" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
+        <div class="z-10 bg-white p-6 rounded-2xl shadow-xl text-center border-4 border-yellow-400 max-w-sm w-full mx-4">
+            <h3 class="text-gray-500 text-sm uppercase tracking-wide">Het geheime woord</h3>
+            <h1 id="seeker-secret-display" class="text-4xl font-bold text-gray-800 my-2">...</h1>
+            <p class="text-gray-400 text-xs">Je tegenspeler is aan het raden...</p>
+        </div>
+        <!-- HINT MODAL -->
+        <div id="seeker-hint-modal" class="absolute bottom-0 left-0 right-0 bg-white p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] transform translate-y-full transition-transform duration-300 z-50">
+            <h3 class="text-lg font-bold text-yellow-800 mb-2">💡 Hint Gevraagd!</h3>
+            <p class="text-sm text-gray-600 mb-3">Geef een hint van 1 woord.</p>
+            <div class="flex gap-2 pb-4"> <!-- Added padding for mobile bottom bar -->
+                <input id="inp-give-hint" type="text" class="game-input flex-1 p-3 rounded" placeholder="Hint...">
+                <button id="btn-send-hint" class="bg-blue-500 text-white px-6 rounded font-bold">Stuur</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 9. NEW GAME SCREEN: DIKE PANIC -->
+    <div id="screen-game-dike" class="screen overflow-hidden select-none">
+        <div id="dike-container" class="absolute inset-0 w-full h-full cursor-crosshair touch-none"></div>
+        
+        <!-- UI Overlay -->
+        <div class="role-badge text-sm border-2 border-black" id="dike-role-display">Rol</div>
+
+        <div class="absolute bottom-6 left-4 right-4 bg-white/95 p-4 rounded-xl shadow-lg flex justify-between items-center z-50 border border-gray-200">
+            <div>
+                <p class="text-[10px] text-gray-500 font-bold uppercase">Water</p>
+                <div class="text-2xl font-bold text-blue-600" id="dike-ammo">20</div>
+            </div>
+            <div class="text-center px-2">
+                <p class="text-[10px] text-gray-500 font-bold uppercase">Gevaar</p>
+                <div class="flex gap-1 justify-center mt-1" id="dike-danger-meter">
+                    <!-- Dots injected via JS -->
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-[10px] text-gray-500 font-bold uppercase">Status</p>
+                <div class="text-sm font-bold text-orange-600" id="dike-status">Veilig</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 8. WINNER SCREEN -->
+    <div id="screen-winner" class="screen bg-green-100">
+        <div class="text-center p-8 bg-white rounded-3xl shadow-xl max-w-md w-full mx-4">
+            <div class="text-6xl mb-4" id="winner-icon">🎉</div>
+            <h1 class="text-3xl font-bold text-green-700 mb-2">Afgelopen!</h1>
+            <p class="text-xl text-gray-700 mb-6" id="winner-text">... heeft gewonnen!</p>
+            
+            <div class="bg-gray-100 p-4 rounded-xl mb-6 hidden" id="classic-end-info">
+                <p class="text-sm text-gray-500">Het woord was:</p>
+                <p id="end-word" class="text-2xl font-bold text-gray-800">Brie</p>
+            </div>
+
+            <button id="btn-reset" class="btn-primary w-full py-4 rounded-lg text-lg shadow">
+                Terug naar Lobby 🔄
+            </button>
+        </div>
+    </div>
+
+    <!-- FIREBASE MODULES -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        // REMOVED signInWithCustomToken to prevent mismatch error with custom user config
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // CONFIG: Using user provided custom config
+        const firebaseConfig = {
+            apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
+            authDomain: "manonopeenrij.firebaseapp.com",
+            projectId: "manonopeenrij",
+            storageBucket: "manonopeenrij.firebasestorage.app",
+            messagingSenderId: "575065794428",
+            appId: "1:575065794428:web:81fc2519d23da55bf3e6f9",
+            measurementId: "G-7K1J5VCDG7"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Global State
+        let currentUser = null;
+        let currentRoomId = null;
+        let unsubscribeRoom = null;
+        let myRole = null; 
+        let renderedGuessesCount = 0;
+        let currentSecretWord = "";
+        let spamInterval = null; 
+        const appId = "ik-zie-ik-zie-manon";
+        let dikeRenderedHoles = [];
+        let authTimeout = null;
+
+        // Audio Context Setup
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        let audioCtx;
+        
+        function initAudio() {
+            if (!audioCtx) {
+                audioCtx = new AudioContext();
+            } else if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        
+        // Simple SFX Synthesizer
+        const sfx = {
+            playTone: (freq, type, duration, startTime = 0) => {
+                if (!audioCtx) return;
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.type = type;
+                osc.frequency.value = freq;
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + startTime);
+                gain.gain.setValueAtTime(0.1, audioCtx.currentTime + startTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + startTime + duration);
+                osc.stop(audioCtx.currentTime + startTime + duration);
+            },
+            win: () => {
+                if (!audioCtx) return;
+                sfx.playTone(523.25, 'triangle', 0.2, 0); // C5
+                sfx.playTone(659.25, 'triangle', 0.2, 0.2); // E5
+                sfx.playTone(783.99, 'triangle', 0.4, 0.4); // G5
+                sfx.playTone(1046.50, 'triangle', 0.6, 0.6); // C6
+            },
+            lose: () => {
+                if (!audioCtx) return;
+                sfx.playTone(150, 'sawtooth', 0.3);
+            },
+            wrong: () => {
+                if (!audioCtx) return;
+                sfx.playTone(100, 'sawtooth', 0.2);
+            },
+            troll: () => {
+                if (!audioCtx) return;
+                for(let i=0; i<5; i++) {
+                    sfx.playTone(Math.random() * 800 + 200, 'square', 0.1, i * 0.1);
+                }
+            },
+            spam: () => {
+                if (!audioCtx) return;
+                sfx.playTone(800, 'square', 0.05);
+            },
+            dikeBreak: () => {
+                if (!audioCtx) return;
+                sfx.playTone(50, 'sawtooth', 1.0);
+            }
+        };
+
+        // DOM Elements
+        const screens = {
+            loading: document.getElementById('screen-loading'),
+            login: document.getElementById('screen-login'),
+            lobby: document.getElementById('screen-lobby'),
+            setup: document.getElementById('screen-setup'),
+            waitingSetup: document.getElementById('screen-waiting-setup'),
+            gameGuesser: document.getElementById('screen-game-guesser'),
+            gameSeeker: document.getElementById('screen-game-seeker'),
+            winner: document.getElementById('screen-winner'),
+            dike: document.getElementById('screen-game-dike')
+        };
+
+        // Initialize Audio on user interaction
+        document.body.addEventListener('click', initAudio, { once: true });
+        document.body.addEventListener('touchstart', initAudio, { once: true });
+
+        // --- Helper Functions ---
+        function showScreen(screenName) {
+            Object.values(screens).forEach(el => el.classList.remove('active'));
+            screens[screenName].classList.add('active');
+        }
+
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toast-msg').innerText = msg;
+            toast.classList.remove('hidden');
+            toast.style.opacity = '1';
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.classList.add('hidden'), 300);
+            }, 3000);
+        }
+
+        function showLoadingError(msg) {
+            document.querySelector('.cheese-spinner').classList.add('hidden');
+            document.getElementById('loading-text').classList.add('hidden');
+            const errDiv = document.getElementById('loading-error');
+            document.getElementById('error-details').innerText = msg;
+            errDiv.classList.remove('hidden');
+        }
+
+        function generateRoomCode() {
+            return Math.random().toString(36).substring(2, 6).toUpperCase();
+        }
+
+        function getRandomPosition() {
+            const top = Math.random() * 80 + 10; 
+            const left = Math.random() * 80 + 10; 
+            return { top: top + '%', left: left + '%' };
+        }
+
+        // --- Cheese Confetti ---
+        function startCheeseConfetti() {
+            const icons = ['🧀', '🍇', '🍷', '🥖', '🎉'];
+            for(let i=0; i<30; i++) {
+                const el = document.createElement('div');
+                el.innerText = icons[Math.floor(Math.random() * icons.length)];
+                el.classList.add('cheese-confetti');
+                el.style.left = Math.random() * 100 + 'vw';
+                el.style.animationDuration = (Math.random() * 2 + 2) + 's';
+                document.body.appendChild(el);
+                
+                // Cleanup
+                setTimeout(() => el.remove(), 4000);
+            }
+        }
+
+        // --- Screen Shake Helper ---
+        function shakeScreen(hard = false) {
+            document.body.classList.remove('shake-soft', 'shake-hard');
+            void document.body.offsetWidth; // trigger reflow
+            document.body.classList.add(hard ? 'shake-hard' : 'shake-soft');
+            if(!hard) setTimeout(() => document.body.classList.remove('shake-soft'), 500);
+        }
+
+        // --- AUTH INIT ---
+        async function initAuth() {
+            const protocol = window.location.protocol;
+            if (protocol === 'file:' || protocol === 'content:') {
+                showLoadingError("Je opent dit bestand lokaal. Multiplayer vereist een webserver (https://).");
+                return;
+            }
+            authTimeout = setTimeout(() => {
+                if (!currentUser) showLoadingError("Verbinding duurt te lang. Controleer je internet of firewall.");
+            }, 8000); 
+
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Auth Error", error);
+                clearTimeout(authTimeout);
+                showLoadingError("Login fout: " + error.message);
+            }
+        }
+        initAuth();
+
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                clearTimeout(authTimeout); 
+                currentUser = user;
+                showScreen('login');
+            }
+        });
+
+        // --- Lobby Logic ---
+        document.getElementById('btn-create-room').addEventListener('click', async () => {
+            initAudio(); // Ensure audio context starts
+            const name = document.getElementById('inp-name').value.trim() || "Speler 1";
+            const code = generateRoomCode();
+            currentRoomId = code;
+            try {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+                await setDoc(roomRef, {
+                    status: 'waiting',
+                    createdAt: Date.now(),
+                    gameMode: 'classic', 
+                    players: [{ uid: currentUser.uid, name: name, isHost: true }],
+                    gameData: {
+                        secretWord: "", secretColor: "#ffffff", guesses: [],
+                        hintRequested: false, hintGiven: "", winner: null,
+                        trollEffect: null, trollData: null, dikeHoles: [], dikeAmmo: 20
+                    }
+                });
+                enterLobby(code);
+            } catch (e) {
+                console.error(e);
+                showToast("Fout bij maken kamer: " + e.message);
+            }
+        });
+
+        document.getElementById('btn-join-room').addEventListener('click', async () => {
+            initAudio(); // Ensure audio context starts
+            const name = document.getElementById('inp-name').value.trim() || "Speler 2";
+            const code = document.getElementById('inp-room-code').value.trim().toUpperCase();
+            if (!code) return showToast("Vul een code in");
+            try {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+                const snap = await getDoc(roomRef);
+                if (!snap.exists()) return showToast("Kamer niet gevonden");
+                const data = snap.data();
+                if (data.status !== 'waiting') return showToast("Spel is al bezig");
+                if (data.players.length >= 2 && !data.players.find(p => p.uid === currentUser.uid)) return showToast("Kamer is vol");
+                if (!data.players.find(p => p.uid === currentUser.uid)) {
+                    const newPlayers = [...data.players, { uid: currentUser.uid, name: name, isHost: false }];
+                    await updateDoc(roomRef, { players: newPlayers });
+                }
+                currentRoomId = code;
+                enterLobby(code);
+            } catch (e) {
+                console.error(e);
+                showToast("Verbindingsfout");
+            }
+        });
+
+        function enterLobby(code) {
+            document.getElementById('lobby-code').innerText = code;
+            showScreen('lobby');
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', code);
+            if (unsubscribeRoom) unsubscribeRoom();
+            unsubscribeRoom = onSnapshot(roomRef, (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                handleRoomUpdate(data);
+            });
+        }
+
+        // --- Game State Handler ---
+        function handleRoomUpdate(data) {
+            const players = data.players;
+            currentSecretWord = data.gameData.secretWord;
+
+            if (data.status === 'waiting') {
+                showScreen('lobby'); 
+                document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
+                const list = document.getElementById('player-list');
+                list.innerHTML = players.map(p => 
+                    `<div class="flex items-center gap-2 p-3 bg-white rounded shadow-sm border border-gray-100">
+                        <div class="h-8 w-8 rounded-full bg-yellow-200 flex items-center justify-center font-bold text-yellow-700">${p.name.charAt(0)}</div>
+                        <span class="font-medium text-gray-700">${p.name} ${p.uid === currentUser.uid ? '(Jij)' : ''}</span>
+                    </div>`
+                ).join('');
+                const amHost = players.find(p => p.uid === currentUser.uid)?.isHost;
+                const hostControls = document.getElementById('host-controls');
+                const waitingMsg = document.getElementById('waiting-msg');
+                const selSeeker = document.getElementById('sel-seeker');
+                if (players.length === 2) {
+                    if (amHost) {
+                        hostControls.classList.remove('hidden');
+                        waitingMsg.classList.add('hidden');
+                        const currentVal = selSeeker.value;
+                        selSeeker.innerHTML = players.map(p => `<option value="${p.uid}">${p.name}</option>`).join('');
+                        if(currentVal && players.some(p => p.uid === currentVal)) selSeeker.value = currentVal;
+                    } else {
+                        hostControls.classList.add('hidden');
+                        waitingMsg.classList.remove('hidden');
+                        waitingMsg.innerText = "De host kiest de instellingen...";
+                    }
+                } else {
+                    hostControls.classList.add('hidden');
+                    waitingMsg.classList.remove('hidden');
+                    waitingMsg.innerText = "Wachten op speler 2...";
+                }
+            }
+            if (data.status === 'setup') {
+                const seekerId = data.seekerId;
+                myRole = (seekerId === currentUser.uid) ? 'seeker' : 'guesser';
+                if (data.gameMode === 'classic') {
+                    if (myRole === 'seeker') showScreen('setup');
+                    else {
+                        document.getElementById('waiting-title').innerText = "Speler zoekt een object...";
+                        showScreen('waitingSetup');
+                    }
+                }
+            }
+            if (data.status === 'playing') {
+                const seekerId = data.seekerId;
+                myRole = (seekerId === currentUser.uid) ? 'seeker' : 'guesser';
+                if (data.gameMode === 'classic') {
+                    if (myRole === 'seeker') { updateSeekerScreen(data); showScreen('gameSeeker'); }
+                    else { updateGuesserScreen(data); showScreen('gameGuesser'); }
+                } else if (data.gameMode === 'dike') { updateDikeScreen(data); showScreen('dike'); }
+            }
+            if (data.status === 'finished') {
+                // Check if this is a fresh finish to play sound only once
+                const previousStatus = document.getElementById('screen-winner').classList.contains('active') ? 'finished' : 'playing';
+                if (previousStatus !== 'finished') {
+                    sfx.win();
+                    startCheeseConfetti();
+                }
+
+                document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
+                const winnerName = data.gameData.winnerName || "Iemand";
+                document.getElementById('winner-text').innerHTML = `<span class="font-bold">${winnerName}</span> heeft gewonnen!`;
+                if (data.gameMode === 'classic') {
+                    document.getElementById('winner-icon').innerText = "🎉";
+                    document.getElementById('end-word').innerText = data.gameData.secretWord;
+                    document.getElementById('classic-end-info').classList.remove('hidden');
+                } else {
+                    document.getElementById('classic-end-info').classList.add('hidden');
+                    if (data.gameData.winner === data.seekerId) {
+                        document.getElementById('winner-icon').innerText = "🌊";
+                        document.getElementById('winner-text').innerText = "Nederland is overstroomd! De Zee wint!";
+                    } else {
+                        document.getElementById('winner-icon').innerText = "🌷";
+                        document.getElementById('winner-text').innerText = "Droge voeten! Hans Brinker wint!";
+                    }
+                }
+                showScreen('winner');
+            }
+        }
+
+        document.getElementById('btn-start-game').addEventListener('click', async () => {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const seekerId = document.getElementById('sel-seeker').value;
+            const gameMode = document.getElementById('sel-gamemode').value;
+            const updateData = {
+                status: (gameMode === 'classic') ? 'setup' : 'playing',
+                seekerId: seekerId, gameMode: gameMode,
+                'gameData.guesses': [], 'gameData.hintRequested': false, 'gameData.hintGiven': "",
+                'gameData.trollEffect': null, 'gameData.winner': null
+            };
+            if (gameMode === 'dike') { updateData['gameData.dikeHoles'] = []; updateData['gameData.dikeAmmo'] = 20; }
+            await updateDoc(roomRef, updateData);
+        });
+
+        // --- CLASSIC GAMEPLAY LOGIC (Seeker/Guesser) ---
+        document.getElementById('btn-confirm-setup').addEventListener('click', async () => {
+            const word = document.getElementById('inp-secret-word').value.trim();
+            const color = document.getElementById('inp-secret-color').value;
+            if (!word) return showToast("Kies een woord!");
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            await updateDoc(roomRef, { status: 'playing', 'gameData.secretWord': word, 'gameData.secretColor': color });
+        });
+
+        function updateGuesserScreen(data) {
+            const color = data.gameData.secretColor;
+            document.getElementById('screen-game-guesser').style.backgroundColor = color;
+            const hintBtn = document.getElementById('btn-request-hint');
+            const hintBox = document.getElementById('guesser-hint-box');
+            if (data.gameData.hintRequested && !data.gameData.hintGiven) {
+                hintBtn.innerText = "Hint aangevraagd..."; hintBtn.disabled = true; hintBtn.classList.add('text-gray-400');
+            } else if (data.gameData.hintGiven) {
+                hintBox.classList.remove('hidden'); document.getElementById('guesser-hint-text').innerText = data.gameData.hintGiven; hintBtn.style.display = 'none';
+            }
+        }
+
+        function updateSeekerScreen(data) {
+            document.getElementById('seeker-secret-display').innerText = data.gameData.secretWord;
+            const guesses = data.gameData.guesses || [];
+            if (guesses.length > renderedGuessesCount) {
+                const container = document.getElementById('wrong-guesses-container');
+                for (let i = renderedGuessesCount; i < guesses.length; i++) spawnFloatingWord(guesses[i], container);
+                
+                // Audio & Shake for wrong guesses
+                if (renderedGuessesCount > 0) { // skip initial load
+                    sfx.wrong();
+                    shakeScreen(false);
+                }
+                renderedGuessesCount = guesses.length;
+            }
+            const effect = data.gameData.trollEffect; const trollData = data.gameData.trollData;
+            if (!effect) {
+                document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
+                if (spamInterval) { clearInterval(spamInterval); spamInterval = null; }
+            } else {
+                if (effect === 'disco') document.body.classList.add('troll-disco');
+                if (effect === 'australia') document.body.classList.add('troll-australia');
+                if (effect === 'tiny') document.body.classList.add('troll-tiny');
+                
+                // Troll Audio & Shake
+                if (!document.body.classList.contains('shake-hard')) {
+                     sfx.troll();
+                     shakeScreen(true);
+                }
+
+                if (effect === 'spam' && trollData && !spamInterval) {
+                    const container = document.getElementById('wrong-guesses-container');
+                    spamInterval = setInterval(() => {
+                        spawnFloatingWord(trollData, container);
+                        sfx.spam(); // Beep on spam
+                    }, 200);
+                    setTimeout(() => { if (spamInterval) { clearInterval(spamInterval); spamInterval = null; } }, 10000);
+                }
+            }
+            const hintModal = document.getElementById('seeker-hint-modal');
+            if (data.gameData.hintRequested && !data.gameData.hintGiven) hintModal.classList.remove('translate-y-full');
+            else hintModal.classList.add('translate-y-full');
+        }
+
+        function spawnFloatingWord(text, container) {
+            const el = document.createElement('div');
+            el.classList.add('floating-word'); el.innerText = text;
+            const pos = getRandomPosition();
+            el.style.top = pos.top; el.style.left = pos.left; el.style.transform = `rotate(${Math.random() * 40 - 20}deg)`;
+            container.appendChild(el);
+        }
+
+        // --- DYNAMIC COMMENTARY GENERATOR ---
+        function getSnarkyComment(guess, secret) {
+            guess = guess.toLowerCase(); secret = secret.toLowerCase();
+            // Easter Eggs
+            if (guess.includes("brie") || guess.includes("kaas")) return "Lekker, maar helaas!";
+            if (guess === "manon") return "Dat is de koningin, niet het object!";
+            if (guess === "ik") return "Nee, jij niet.";
+
+            // Logic
+            if (guess[0] === secret[0]) return "Goede beginletter! 👀";
+            if (guess.length > secret.length + 4) return "Veel te lang joh! ✂️";
+            if (guess.length < secret.length - 4) return "Veel te kort! 📏";
+
+            // Random Snark
+            const snarks = [
+                "Is dat alles?", "Bril nodig? 👓", "Hahaha... nee.",
+                "Manon lacht je uit.", "Pannenkoek 🥞", "Probeer harder!",
+                "Echt niet.", "Warmer... nee grapje.", "Zucht...", 
+                "Verkeerde gok, vriend.", "Heb je nog opties?"
+            ];
+            return snarks[Math.floor(Math.random() * snarks.length)];
+        }
+
+        function showDynamicComment(text) {
+            const el = document.getElementById('dynamic-comment');
+            el.innerText = text;
+            el.classList.remove('comment-pop');
+            void el.offsetWidth; // trigger reflow
+            el.classList.add('comment-pop');
+        }
+
+        document.getElementById('btn-submit-guess').addEventListener('click', async () => {
+            const inputEl = document.getElementById('inp-guess');
+            const guess = inputEl.value.trim();
+            if(!guess) return;
+            if (guess.toLowerCase() === "hocus pocus") {
+                inputEl.value = ""; document.getElementById('cheat-menu').classList.remove('hidden'); return;
+            }
+            
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const snap = await getDoc(roomRef);
+            const gameData = snap.data().gameData;
+            
+            if (guess.toLowerCase() === gameData.secretWord.toLowerCase()) {
+                await updateDoc(roomRef, { status: 'finished', 'gameData.winner': currentUser.uid, 'gameData.winnerName': currentUser.displayName || "De Rader" });
+            } else {
+                // Show Dynamic Comment (Local only)
+                const comment = getSnarkyComment(guess, gameData.secretWord);
+                showDynamicComment(comment);
+                
+                // Play wrong sound locally for immediate feedback
+                sfx.wrong();
+                shakeScreen(false);
+
+                inputEl.value = "";
+                inputEl.classList.add('border-red-500');
+                document.getElementById('guess-feedback').innerText = "Fout!";
+                setTimeout(() => { inputEl.classList.remove('border-red-500'); document.getElementById('guess-feedback').innerText = ""; }, 1000);
+                await updateDoc(roomRef, { 'gameData.guesses': arrayUnion(guess) });
+            }
+        });
+
+        // --- DIKE PANIC LOGIC ---
+        function updateDikeScreen(data) {
+            const container = document.getElementById('dike-container');
+            const roleDisplay = document.getElementById('dike-role-display');
+            const ammoDisplay = document.getElementById('dike-ammo');
+            const statusDisplay = document.getElementById('dike-status');
+            const dangerMeter = document.getElementById('dike-danger-meter');
+            const holes = data.gameData.dikeHoles || [];
+            const ammo = data.gameData.dikeAmmo;
+
+            if (myRole === 'seeker') {
+                roleDisplay.innerText = "🌊 JIJ BENT DE ZEE";
+                container.className = "absolute inset-0 w-full h-full cursor-crosshair water-bg";
+                roleDisplay.className = "role-badge text-blue-800 border-2 border-blue-500";
+            } else {
+                roleDisplay.innerText = "🧱 JIJ BENT HANS BRINKER";
+                container.className = "absolute inset-0 w-full h-full cursor-pointer dike-bg";
+                roleDisplay.className = "role-badge text-orange-800 border-2 border-orange-500";
+            }
+            ammoDisplay.innerText = `${ammo}/20`;
+            const dangerLevel = holes.length;
+            dangerMeter.innerHTML = '';
+            for(let i=0; i<5; i++) {
+                const dot = document.createElement('div');
+                dot.className = `w-4 h-4 rounded-full border border-gray-400 ${i < dangerLevel ? 'bg-red-600 animate-ping' : 'bg-gray-200'}`;
+                dangerMeter.appendChild(dot);
+            }
+            if (dangerLevel >= 3) {
+                statusDisplay.innerText = "KRITIEK!";
+                document.body.classList.add('shake-hard'); // Shake on danger
+                sfx.playTone(100, 'sawtooth', 0.2); // Constant buzzing warning
+            } else if (dangerLevel > 0) {
+                statusDisplay.innerText = "Lekkage!";
+                document.body.classList.remove('shake-hard');
+            } else {
+                statusDisplay.innerText = "Veilig";
+                document.body.classList.remove('shake-hard');
+            }
+
+            container.innerHTML = ''; 
+            holes.forEach(hole => {
+                const h = document.createElement('div');
+                h.className = "dike-hole"; h.style.top = hole.y + '%'; h.style.left = hole.x + '%'; h.innerHTML = "💧";
+                if (myRole === 'guesser') { h.onclick = (e) => { e.stopPropagation(); fixDikeHole(hole); }; }
+                container.appendChild(h);
+            });
+            
+            // SFX on new holes
+            if(holes.length > dikeRenderedHoles.length) {
+                sfx.wrong(); // Splash sound placeholder
+            }
+
+            dikeRenderedHoles = holes;
+            if (dangerLevel >= 5) {
+                sfx.dikeBreak();
+                endDikeGame(data.seekerId, "De Zee");
+            } else if (ammo <= 0 && dangerLevel === 0) { 
+                const hans = data.players.find(p => p.uid !== data.seekerId); 
+                endDikeGame(hans.uid, "Hans Brinker"); 
+            }
+        }
+
+        async function endDikeGame(winnerId, winnerName) {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const snap = await getDoc(roomRef);
+            if(snap.data().status === 'finished') return; 
+            await updateDoc(roomRef, { status: 'finished', 'gameData.winner': winnerId, 'gameData.winnerName': winnerName });
+        }
+
+        document.getElementById('dike-container').addEventListener('click', async (e) => {
+            if (myRole !== 'seeker') return; 
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const snap = await getDoc(roomRef); const data = snap.data();
+            if (data.status !== 'playing' || data.gameMode !== 'dike') return;
+            if (data.gameData.dikeAmmo <= 0) return showToast("Je water is op!");
+            if ((data.gameData.dikeHoles || []).length >= 5) return; 
+            const rect = e.target.getBoundingClientRect();
+            const x = ((e.clientX - rect.left) / rect.width) * 90; const y = ((e.clientY - rect.top) / rect.height) * 90;
+            const newHole = { id: Date.now(), x: Math.max(5, x), y: Math.max(5, y) }; 
+            await updateDoc(roomRef, { 'gameData.dikeHoles': [...(data.gameData.dikeHoles || []), newHole], 'gameData.dikeAmmo': data.gameData.dikeAmmo - 1 });
+        });
+
+        async function fixDikeHole(holeToRemove) {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const snap = await getDoc(roomRef);
+            const updatedHoles = (snap.data().gameData.dikeHoles || []).filter(h => h.id !== holeToRemove.id);
+            await updateDoc(roomRef, { 'gameData.dikeHoles': updatedHoles });
+        }
+
+        // --- SHARED BUTTONS ---
+        document.getElementById('btn-request-hint').addEventListener('click', async () => {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId); await updateDoc(roomRef, { 'gameData.hintRequested': true });
+        });
+        document.getElementById('btn-send-hint').addEventListener('click', async () => {
+            const hint = document.getElementById('inp-give-hint').value.trim();
+            if (!hint || hint.includes(" ")) return showToast("1 woord aub!");
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId); await updateDoc(roomRef, { 'gameData.hintGiven': hint });
+        });
+        document.getElementById('btn-reset').addEventListener('click', async () => {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            await updateDoc(roomRef, {
+                status: 'waiting', 'gameData.secretWord': '', 'gameData.secretColor': '#ffffff', 'gameData.guesses': [],
+                'gameData.hintRequested': false, 'gameData.hintGiven': '', 'gameData.winner': null, 'gameData.winnerName': null,
+                'gameData.trollEffect': null, 'gameData.dikeHoles': [], 'gameData.dikeAmmo': 20
+            });
+            renderedGuessesCount = 0; document.getElementById('wrong-guesses-container').innerHTML = "";
+            document.getElementById('inp-guess').value = ""; document.getElementById('inp-secret-word').value = ""; document.getElementById('inp-give-hint').value = "";
+            document.getElementById('guesser-hint-box').classList.add('hidden'); document.getElementById('dynamic-comment').innerText = "";
+            document.getElementById('btn-request-hint').style.display = 'block'; document.getElementById('btn-request-hint').disabled = false;
+        });
+
+        // Cheat Menu Handlers
+        async function triggerTroll(effect, data = null) {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            await updateDoc(roomRef, { 'gameData.trollEffect': effect, 'gameData.trollData': data });
+            showToast("HACK ACTIVATED: " + effect.toUpperCase()); document.getElementById('cheat-menu').classList.add('hidden');
+            setTimeout(async () => { await updateDoc(roomRef, { 'gameData.trollEffect': null, 'gameData.trollData': null }); }, 10000);
+        }
+        document.getElementById('btn-cheat-reveal').addEventListener('click', () => alert("HET ANTWOORD IS: " + currentSecretWord));
+        document.getElementById('btn-cheat-hint').addEventListener('click', () => alert("HET BEGINT MET: " + currentSecretWord.charAt(0).toUpperCase()));
+        document.getElementById('btn-cheat-disco').addEventListener('click', () => triggerTroll('disco'));
+        document.getElementById('btn-cheat-australia').addEventListener('click', () => triggerTroll('australia'));
+        document.getElementById('btn-cheat-tiny').addEventListener('click', () => triggerTroll('tiny'));
+        document.getElementById('btn-cheat-spam').addEventListener('click', () => { const word = document.getElementById('inp-cheat-spam').value || "HA HA HA"; triggerTroll('spam', word); });
+    </script>
+</body>
+</html>
