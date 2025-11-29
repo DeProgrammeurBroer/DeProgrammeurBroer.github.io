@@ -143,6 +143,33 @@
             border-bottom-left-radius: 2px;
         }
 
+        /* --- MINIGAME STYLES --- */
+        .fly {
+            position: absolute;
+            font-size: 24px;
+            user-select: none;
+            cursor: pointer;
+            transition: transform 0.1s linear;
+            z-index: 10;
+        }
+        .fly.dead {
+            transform: scale(0);
+            transition: transform 0.2s;
+            pointer-events: none;
+        }
+        .picnic-bg {
+            background-color: #fff;
+            background-image: linear-gradient(90deg, rgba(200,0,0,.15) 50%, transparent 50%),
+            linear-gradient(rgba(200,0,0,.15) 50%, transparent 50%);
+            background-size: 50px 50px;
+        }
+        .main-cheese {
+            font-size: 80px;
+            transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 5;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+        }
+
         /* Cheat Menu Styles */
         .cheat-overlay {
             background: rgba(0, 0, 0, 0.85);
@@ -332,6 +359,11 @@
                         </button>
                     </div>
                 </div>
+                
+                <!-- Solo Game Button -->
+                <button id="btn-start-solo-game" class="w-full bg-green-500 text-white font-bold py-3 rounded-lg hover:bg-green-600 mb-6 shadow-md border-b-4 border-green-700 active:border-0 active:translate-y-1">
+                    <i class="fas fa-gamepad mr-2"></i>Speel: Kaas Beschermer (Solo)
+                </button>
 
                 <div id="waiting-msg" class="text-gray-400 animate-pulse bg-white p-3 rounded-lg border border-gray-200">
                     Wachten op speler 2...
@@ -359,6 +391,46 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- 10. NEW MINIGAME SCREEN: CHEESE PROTECTOR -->
+    <div id="screen-minigame-cheese" class="screen picnic-bg overflow-hidden select-none">
+        <div id="fly-container" class="absolute inset-0 w-full h-full"></div>
+        
+        <!-- Center Cheese -->
+        <div id="center-cheese" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 main-cheese cursor-pointer">🧀</div>
+        
+        <!-- Top HUD -->
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none">
+            <div class="bg-white/90 p-2 rounded-lg shadow border border-red-200">
+                <p class="text-xs text-gray-500 font-bold uppercase">Levens</p>
+                <div id="cheese-lives-display" class="flex gap-1 text-xl">❤️❤️❤️</div>
+            </div>
+            <div class="bg-white/90 p-2 rounded-lg shadow border border-yellow-200 text-right">
+                <p class="text-xs text-gray-500 font-bold uppercase">Punten</p>
+                <div id="cheese-score-display" class="text-2xl font-bold text-yellow-600">0</div>
+            </div>
+        </div>
+
+        <!-- Shop & Controls Bottom -->
+        <div class="absolute bottom-0 w-full bg-white/95 p-4 rounded-t-2xl shadow-[0_-5px_20px_rgba(0,0,0,0.1)] border-t border-gray-200 z-50">
+             <div class="flex justify-between items-center mb-2">
+                 <h3 class="font-bold text-yellow-800"><i class="fas fa-store mr-1"></i>Kaas Winkel</h3>
+                 <button id="btn-exit-cheese" class="text-xs text-gray-400 underline">Stoppen</button>
+             </div>
+             <div class="flex gap-2 overflow-x-auto pb-2" id="shop-container">
+                 <!-- Shop Items Injected JS -->
+             </div>
+        </div>
+        
+        <!-- Game Over Overlay -->
+        <div id="cheese-game-over" class="absolute inset-0 bg-black/80 z-[60] flex flex-col items-center justify-center hidden text-white text-center">
+            <div class="text-6xl mb-4">🪰</div>
+            <h2 class="text-3xl font-bold text-red-500 mb-2">KAAS OPGEGETEN!</h2>
+            <p class="mb-6">Score: <span id="final-cheese-score" class="text-yellow-400 font-bold">0</span></p>
+            <button id="btn-retry-cheese" class="bg-yellow-500 text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform">Nog een keer</button>
+            <button id="btn-quit-cheese" class="mt-4 text-gray-400 text-sm underline">Terug naar lobby</button>
         </div>
     </div>
 
@@ -480,7 +552,6 @@
     <!-- FIREBASE MODULES -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // REMOVED signInWithCustomToken to prevent mismatch error with custom user config
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -511,15 +582,33 @@
         let dikeRenderedHoles = [];
         let authTimeout = null;
 
+        // Minigame State
+        let cheeseGameLoop = null;
+        let cheeseSpawnInterval = null;
+        let cheeseLives = 3;
+        let cheeseScore = 0;
+        let cheeseFlies = [];
+        let cheeseGameActive = false;
+        let cheeseCatActive = false; // Boost state
+
         // Audio Context Setup
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
+        let bgMusic; // Background music
         
         function initAudio() {
             if (!audioCtx) {
                 audioCtx = new AudioContext();
             } else if (audioCtx.state === 'suspended') {
                 audioCtx.resume();
+            }
+
+            // Init Background Music
+            if (!bgMusic) {
+                bgMusic = new Audio('Boodschappenlied.mp3');
+                bgMusic.loop = true;
+                bgMusic.volume = 0.4; // Background volume
+                bgMusic.play().catch(e => console.log("Autoplay blocked/File not found", e));
             }
         }
         
@@ -553,6 +642,19 @@
                 if (!audioCtx) return;
                 sfx.playTone(100, 'sawtooth', 0.2);
             },
+            splat: () => {
+                if (!audioCtx) return;
+                sfx.playTone(50, 'square', 0.1);
+            },
+            damage: () => {
+                 if (!audioCtx) return;
+                 sfx.playTone(200, 'sawtooth', 0.3);
+            },
+            buy: () => {
+                if (!audioCtx) return;
+                sfx.playTone(880, 'sine', 0.1);
+                sfx.playTone(1760, 'sine', 0.1, 0.1);
+            },
             troll: () => {
                 if (!audioCtx) return;
                 for(let i=0; i<5; i++) {
@@ -579,7 +681,8 @@
             gameGuesser: document.getElementById('screen-game-guesser'),
             gameSeeker: document.getElementById('screen-game-seeker'),
             winner: document.getElementById('screen-winner'),
-            dike: document.getElementById('screen-game-dike')
+            dike: document.getElementById('screen-game-dike'),
+            cheeseMinigame: document.getElementById('screen-minigame-cheese')
         };
 
         // Initialize Audio on user interaction
@@ -674,6 +777,219 @@
             }
         });
 
+        // --- CHEESE MINIGAME LOGIC ---
+        const cheeseItems = [
+            { id: 1, name: "Grote Mepper", cost: 50, icon: "🏏", desc: "Groter klikbereik" },
+            { id: 2, name: "Deo Spray", cost: 100, icon: "🧴", desc: "Vliegen worden traag" },
+            { id: 3, name: "De Huiskat", cost: 200, icon: "🐱", desc: "Vangt automatisch vliegen" },
+            { id: 4, name: "Kaas Plakken", cost: 300, icon: "🩹", desc: "+1 Leven" },
+            { id: 5, name: "Manon's Schreeuw", cost: 500, icon: "🗣️", desc: "Nuke alle vliegen!" }
+        ];
+
+        document.getElementById('btn-start-solo-game').addEventListener('click', startCheeseGame);
+        document.getElementById('btn-exit-cheese').addEventListener('click', stopCheeseGame);
+        document.getElementById('btn-quit-cheese').addEventListener('click', stopCheeseGame);
+        document.getElementById('btn-retry-cheese').addEventListener('click', () => {
+             document.getElementById('cheese-game-over').classList.add('hidden');
+             startCheeseGame();
+        });
+
+        function startCheeseGame() {
+            initAudio();
+            showScreen('cheeseMinigame');
+            
+            // Reset state
+            cheeseLives = 3;
+            cheeseScore = 0;
+            cheeseFlies = [];
+            cheeseGameActive = true;
+            cheeseCatActive = false;
+            
+            // Reset UI
+            updateCheeseUI();
+            document.getElementById('fly-container').innerHTML = '';
+            document.getElementById('center-cheese').style.transform = 'translate(-50%, -50%) scale(1)';
+            
+            // Render Shop
+            renderShop();
+
+            // Start Loops
+            if(cheeseGameLoop) clearInterval(cheeseGameLoop);
+            if(cheeseSpawnInterval) clearInterval(cheeseSpawnInterval);
+            
+            cheeseGameLoop = setInterval(updateCheeseGame, 1000/60); // 60fps
+            cheeseSpawnInterval = setInterval(spawnFly, 2000); // Start slow
+        }
+
+        function stopCheeseGame() {
+            cheeseGameActive = false;
+            if(cheeseGameLoop) clearInterval(cheeseGameLoop);
+            if(cheeseSpawnInterval) clearInterval(cheeseSpawnInterval);
+            document.getElementById('cheese-game-over').classList.add('hidden');
+            showScreen('lobby');
+        }
+
+        function renderShop() {
+            const container = document.getElementById('shop-container');
+            container.innerHTML = cheeseItems.map(item => `
+                <button onclick="buyItem(${item.id})" class="flex-shrink-0 bg-yellow-100 border border-yellow-300 rounded-lg p-2 w-32 text-left hover:bg-yellow-200 active:scale-95 transition-transform">
+                    <div class="text-xl mb-1">${item.icon}</div>
+                    <div class="font-bold text-xs text-yellow-900 leading-tight">${item.name}</div>
+                    <div class="text-[10px] text-gray-500">${item.cost} pnt</div>
+                </button>
+            `).join('');
+        }
+        
+        // Expose to window for inline onclick
+        window.buyItem = (id) => {
+            const item = cheeseItems.find(i => i.id === id);
+            if(cheeseScore >= item.cost) {
+                cheeseScore -= item.cost;
+                sfx.buy();
+                applyBoost(id);
+                updateCheeseUI();
+            } else {
+                showToast("Niet genoeg punten!");
+            }
+        };
+
+        function applyBoost(id) {
+            if(id === 1) { // Grote Mepper
+                document.getElementById('fly-container').classList.add('cursor-crosshair'); // Visual cue
+                // Logic handled in click handler (radius)
+            }
+            if(id === 2) { // Deo
+                cheeseFlies.forEach(f => f.speed *= 0.5);
+            }
+            if(id === 3) { // Kat
+                cheeseCatActive = true;
+                showToast("De kat helpt mee!");
+            }
+            if(id === 4) { // Heal
+                if(cheeseLives < 3) { cheeseLives++; updateCheeseVisuals(); }
+            }
+            if(id === 5) { // Nuke
+                cheeseFlies.forEach(f => killFly(f.id));
+                shakeScreen(true);
+            }
+        }
+
+        function spawnFly() {
+            if(!cheeseGameActive) return;
+            
+            // Spawn at edge
+            const side = Math.floor(Math.random() * 4); // 0:top, 1:right, 2:bottom, 3:left
+            let x, y;
+            if(side === 0) { x = Math.random() * window.innerWidth; y = -50; }
+            if(side === 1) { x = window.innerWidth + 50; y = Math.random() * window.innerHeight; }
+            if(side === 2) { x = Math.random() * window.innerWidth; y = window.innerHeight + 50; }
+            if(side === 3) { x = -50; y = Math.random() * window.innerHeight; }
+
+            const id = Date.now() + Math.random();
+            const el = document.createElement('div');
+            el.className = 'fly';
+            el.innerHTML = '🪰';
+            el.style.left = x + 'px';
+            el.style.top = y + 'px';
+            
+            // Click to kill
+            el.onmousedown = (e) => { e.stopPropagation(); killFly(id); };
+            el.ontouchstart = (e) => { e.stopPropagation(); killFly(id); };
+
+            document.getElementById('fly-container').appendChild(el);
+            
+            cheeseFlies.push({
+                id: id,
+                el: el,
+                x: x, 
+                y: y,
+                speed: 1 + (cheeseScore / 500) // Gets harder
+            });
+            
+            // Difficulty ramp up
+            if(cheeseScore > 100) clearInterval(cheeseSpawnInterval);
+            cheeseSpawnInterval = setInterval(spawnFly, Math.max(500, 2000 - (cheeseScore * 2)));
+        }
+
+        function updateCheeseGame() {
+            if(!cheeseGameActive) return;
+            
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            
+            // Auto Cat Logic
+            if(cheeseCatActive && Math.random() < 0.05 && cheeseFlies.length > 0) {
+                killFly(cheeseFlies[0].id);
+            }
+
+            cheeseFlies.forEach((fly, index) => {
+                // Move towards center
+                const dx = centerX - fly.x;
+                const dy = centerY - fly.y;
+                const dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if(dist < 40) { // Hit Cheese
+                    damageCheese();
+                    fly.el.remove();
+                    cheeseFlies.splice(index, 1);
+                } else {
+                    const moveX = (dx / dist) * fly.speed;
+                    const moveY = (dy / dist) * fly.speed;
+                    fly.x += moveX;
+                    fly.y += moveY;
+                    fly.el.style.left = fly.x + 'px';
+                    fly.el.style.top = fly.y + 'px';
+                    // Rotate to face center
+                    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+                    fly.el.style.transform = `rotate(${angle + 90}deg)`;
+                }
+            });
+        }
+
+        function killFly(id) {
+            const index = cheeseFlies.findIndex(f => f.id === id);
+            if(index !== -1) {
+                const fly = cheeseFlies[index];
+                sfx.splat();
+                fly.el.innerHTML = "💥";
+                fly.el.classList.add('dead');
+                setTimeout(() => fly.el.remove(), 200);
+                cheeseFlies.splice(index, 1);
+                cheeseScore += 10;
+                updateCheeseUI();
+            }
+        }
+
+        function damageCheese() {
+            cheeseLives--;
+            sfx.damage();
+            shakeScreen(true);
+            updateCheeseUI();
+            updateCheeseVisuals();
+
+            if(cheeseLives <= 0) {
+                cheeseGameActive = false;
+                sfx.lose();
+                document.getElementById('final-cheese-score').innerText = cheeseScore;
+                document.getElementById('cheese-game-over').classList.remove('hidden');
+            }
+        }
+
+        function updateCheeseVisuals() {
+            const cheese = document.getElementById('center-cheese');
+            let scale = 1;
+            if(cheeseLives === 2) scale = 0.75;
+            if(cheeseLives === 1) scale = 0.50;
+            cheese.style.transform = `translate(-50%, -50%) scale(${scale})`;
+        }
+
+        function updateCheeseUI() {
+            let hearts = "";
+            for(let i=0; i<cheeseLives; i++) hearts += "🧀"; // Using cheese instead of hearts is funnier, or stick to hearts
+            document.getElementById('cheese-lives-display').innerText = "❤️❤️❤️".substring(0, cheeseLives*2); 
+            document.getElementById('cheese-score-display').innerText = cheeseScore;
+        }
+
         // --- Lobby Logic ---
         document.getElementById('btn-create-room').addEventListener('click', async () => {
             initAudio(); // Ensure audio context starts
@@ -749,26 +1065,8 @@
             if (!text || !currentRoomId) return;
 
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-            const myName = currentUser.displayName || (currentUser.uid === 'host' ? 'Host' : 'Speler'); // Fallback logic handled in player array usually, but simple here:
-            // Find my name from players array ideally, but simple push is okay for now.
-            // Let's get name from local input or state if needed, but easier:
-            // Actually we don't have local 'myName' variable stored easily except in players array in DB.
-            // We can fetch doc or just assume 'Ik' for local render? No, needs to be in DB.
+            const myName = currentUser.displayName || (currentUser.uid === 'host' ? 'Host' : 'Speler'); 
             
-            // Fetch latest state to get my name? Or just push and use UID to identify in UI.
-            // Let's grab name from the players list in DOM or memory if possible.
-            // For robustness, let's just push UID and let UI resolve name, OR push name too.
-            // We'll trust the name we used to join.
-            // A bit hacky: we find our name in the current 'players' data from the snapshot handler?
-            // Let's just use "Ik" for self and let others see "Tegenspeler"? No, we want names.
-            // Solution: We update the chat message with just text/uid/timestamp, and mapping happens in render.
-            // BUT, to keep it simple and self-contained in arrayUnion:
-            // We need our name. 
-            // Let's quick-fetch it or store it globally on join.
-            
-            // optimization: grab name from the 'inp-name' field which is still populated or look at players array in memory?
-            // Let's look at the current players data available in handleRoomUpdate scope? No.
-            // Let's just fetch the doc once to get my name.
             const snap = await getDoc(roomRef);
             const me = snap.data().players.find(p => p.uid === currentUser.uid);
             const name = me ? me.name : "Onbekend";
