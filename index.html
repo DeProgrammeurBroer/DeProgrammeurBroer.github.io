@@ -10,10 +10,25 @@
         @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;600&display=swap');
         @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap'); /* Hacker font */
         
+        :root {
+            --bg-color: #f3f4f6;
+            --text-color: #1f2937;
+            --card-bg: #ffffff;
+            --input-bg: #fff;
+        }
+
+        body.dark-mode {
+            --bg-color: #111827;
+            --text-color: #f3f4f6;
+            --card-bg: #1f2937;
+            --input-bg: #374151;
+        }
+
         body {
             font-family: 'Fredoka', sans-serif;
-            background-color: #f3f4f6;
-            transition: background-color 0.5s ease, transform 0.5s ease, filter 0.5s ease;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.5s ease, color 0.5s ease;
             overflow: hidden; /* Prevent scroll */
             touch-action: none; /* Better tapping on mobile */
             overscroll-behavior: none; /* Prevent pull-to-refresh on mobile */
@@ -31,6 +46,17 @@
             position: relative; 
         }
         .screen.active { display: flex; }
+
+        /* Dark Mode Overrides for Specific Elements */
+        body.dark-mode .screen { background-color: var(--bg-color); }
+        body.dark-mode .bg-white { background-color: var(--card-bg); color: var(--text-color); }
+        body.dark-mode .text-gray-800 { color: #f3f4f6; }
+        body.dark-mode .text-gray-700 { color: #d1d5db; }
+        body.dark-mode .text-gray-600 { color: #9ca3af; }
+        body.dark-mode .bg-yellow-50 { background-color: #374151; color: #f3f4f6; border-color: #4b5563; }
+        body.dark-mode .bg-gray-100 { background-color: #111827; }
+        body.dark-mode input { background-color: var(--input-bg); color: var(--text-color); border-color: #4b5563; }
+        body.dark-mode #lobby-code { background-color: #374151; border-color: #4b5563; }
 
         /* Floating wrong guesses */
         .floating-word {
@@ -142,13 +168,18 @@
             color: #374151;
             border-bottom-left-radius: 2px;
         }
+        body.dark-mode .chat-message.them {
+            background-color: #374151;
+            border-color: #4b5563;
+            color: #f3f4f6;
+        }
         
-        /* Chat Bubble Animation */
-        .chat-popup-enter {
+        /* Popups Animation */
+        .popup-enter {
             animation: popInChat 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
         }
         @keyframes popInChat {
-            from { opacity: 0; transform: scale(0.8) translate(-10px, -10px); }
+            from { opacity: 0; transform: scale(0.8) translate(0, -10px); }
             to { opacity: 1; transform: scale(1) translate(0, 0); }
         }
 
@@ -172,6 +203,12 @@
             linear-gradient(rgba(200,0,0,.15) 50%, transparent 50%);
             background-size: 50px 50px;
         }
+        body.dark-mode .picnic-bg {
+            background-color: #111827;
+            background-image: linear-gradient(90deg, rgba(200,50,50,.2) 50%, transparent 50%),
+            linear-gradient(rgba(200,50,50,.2) 50%, transparent 50%);
+        }
+
         .main-cheese {
             font-size: 80px;
             transition: transform 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -205,56 +242,45 @@
             font-family: 'VT323', monospace;
             padding: 5px;
         }
-
-        /* --- PANIEK OP DE DIJK CSS --- */
-        .dike-bg {
-            background-image: repeating-linear-gradient(45deg, #b45309 25%, #92400e 25%, #92400e 50%, #b45309 50%, #b45309 75%, #92400e 75%, #92400e 100%);
-            background-size: 40px 40px;
-        }
-        .water-bg {
-            background-color: #3b82f6;
-            background-image: radial-gradient(#60a5fa 2px, transparent 2px);
-            background-size: 20px 20px;
-        }
-        .dike-hole {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            background: radial-gradient(circle, #2563eb 40%, #1e40af 100%);
-            border-radius: 50%;
-            border: 4px solid #93c5fd;
-            box-shadow: 0 0 15px #3b82f6;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 24px;
-            animation: pulseWater 0.5s infinite alternate;
-            cursor: pointer;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
-        @keyframes pulseWater { from { transform: scale(1); } to { transform: scale(1.1); } }
         
-        .role-badge {
-            position: absolute;
-            top: 10px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: white;
-            padding: 5px 15px;
-            border-radius: 20px;
-            font-weight: bold;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-            z-index: 50;
+        /* Settings Slider */
+        input[type=range] {
+            width: 100%;
+            height: 6px;
+            background: #e5e7eb;
+            border-radius: 5px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        input[type=range]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #fbbf24;
+            cursor: pointer;
+            border: 2px solid #d97706;
         }
 
-        /* Commentary Animation */
-        .comment-pop {
-            animation: commentPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        /* Sparkling Animation for AI buttons */
+        .sparkle-btn {
+            position: relative;
+            overflow: hidden;
         }
-        @keyframes commentPop {
-            0% { transform: scale(0.5) translateY(20px); opacity: 0; }
-            100% { transform: scale(1) translateY(0); opacity: 1; }
+        .sparkle-btn::after {
+            content: "";
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(to right, transparent, rgba(255,255,255,0.4), transparent);
+            transform: rotate(45deg);
+            animation: sparkle 3s infinite;
+        }
+        @keyframes sparkle {
+            0% { transform: translate(-100%, -100%) rotate(45deg); }
+            100% { transform: translate(100%, 100%) rotate(45deg); }
         }
 
     </style>
@@ -350,8 +376,13 @@
             <span id="chat-notification" class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 flex items-center justify-center rounded-full hidden border-2 border-white font-bold animate-bounce">!</span>
         </button>
 
+        <!-- FLOATING SETTINGS TOGGLE (Top-Right) -->
+        <button id="btn-settings-toggle" class="absolute top-4 right-4 bg-gray-200 text-gray-700 w-12 h-12 rounded-full shadow-lg z-30 flex items-center justify-center text-xl hover:scale-110 transition-transform active:scale-95 border border-gray-300">
+            <i class="fas fa-cog"></i>
+        </button>
+
         <!-- CHAT POPUP BUBBLE -->
-        <div id="chat-popup" class="absolute top-16 left-4 w-72 bg-white border-4 border-yellow-300 rounded-3xl rounded-tl-none shadow-2xl z-30 hidden flex-col p-4 origin-top-left transition-all chat-popup-enter">
+        <div id="chat-popup" class="absolute top-16 left-4 w-72 bg-white border-4 border-yellow-300 rounded-3xl rounded-tl-none shadow-2xl z-30 hidden flex-col p-4 origin-top-left transition-all popup-enter">
             <h3 class="font-bold text-yellow-800 mb-2 text-sm flex items-center justify-between">
                 <span><i class="far fa-comments mr-1"></i> Kletsen</span>
                 <button onclick="document.getElementById('chat-popup').classList.add('hidden')" class="text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>
@@ -367,7 +398,46 @@
             </div>
         </div>
 
-        <div class="w-full max-w-md p-4 mt-8"> <!-- Added top margin for button space -->
+        <!-- SETTINGS POPUP BUBBLE -->
+        <div id="settings-popup" class="absolute top-16 right-4 w-72 bg-white border-4 border-gray-300 rounded-3xl rounded-tr-none shadow-2xl z-30 hidden flex-col p-4 origin-top-right transition-all popup-enter">
+            <h3 class="font-bold text-gray-800 mb-4 text-sm flex items-center justify-between">
+                <span><i class="fas fa-sliders-h mr-1"></i> Instellingen</span>
+                <button onclick="document.getElementById('settings-popup').classList.add('hidden')" class="text-gray-400 hover:text-red-500"><i class="fas fa-times"></i></button>
+            </h3>
+            
+            <div class="space-y-4">
+                <!-- Volume -->
+                <div>
+                    <label class="text-xs font-bold text-gray-500 uppercase flex justify-between">
+                        Muziek Volume <span id="vol-display">40%</span>
+                    </label>
+                    <input type="range" id="inp-volume" min="0" max="100" value="40" class="mt-1">
+                </div>
+
+                <!-- SFX Toggle -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium"><i class="fas fa-volume-up w-5"></i> Geluidseffecten</span>
+                    <button id="btn-toggle-sfx" class="bg-green-500 w-10 h-6 rounded-full relative transition-colors">
+                        <div class="absolute right-1 top-1 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </button>
+                </div>
+
+                <!-- Dark Mode -->
+                <div class="flex items-center justify-between">
+                    <span class="text-sm font-medium"><i class="fas fa-moon w-5"></i> Donkere Modus</span>
+                    <button id="btn-toggle-dark" class="bg-gray-300 w-10 h-6 rounded-full relative transition-colors">
+                        <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform"></div>
+                    </button>
+                </div>
+
+                <!-- Fullscreen -->
+                <button id="btn-fullscreen" class="w-full py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-bold text-gray-700">
+                    <i class="fas fa-expand mr-1"></i> Volledig Scherm
+                </button>
+            </div>
+        </div>
+
+        <div class="w-full max-w-md p-4 mt-8">
             <div class="bg-yellow-50 p-6 rounded-2xl shadow-lg text-center w-full">
                 <h2 class="text-2xl font-bold text-yellow-800 mb-2">Lobby: <span id="lobby-code" class="font-mono text-3xl select-all cursor-pointer bg-white px-2 rounded border border-yellow-200">....</span></h2>
                 <p class="text-gray-500 text-sm mb-6">Deel deze code met je tegenspeler</p>
@@ -391,7 +461,6 @@
                     <label class="block text-gray-700 text-sm font-bold mb-2">1. Spelmodus</label>
                     <select id="sel-gamemode" class="game-input w-full p-2 rounded-lg bg-white cursor-pointer mb-4 h-12">
                         <option value="classic">🎨 Klassiek (Ik zie ik zie)</option>
-                        <option value="dike">🌊 Paniek op de Dijk (Nieuw!)</option>
                     </select>
 
                     <label class="block text-gray-700 text-sm font-bold mb-2">2. Rollen</label>
@@ -399,11 +468,16 @@
                          <select id="sel-seeker" class="game-input w-full p-2 rounded-lg bg-white cursor-pointer h-12">
                             <!-- Options injected via JS -->
                          </select>
-                         <p class="text-xs text-gray-400 mt-1">Kies wie begint als Zoeker / De Zee</p>
+                         <p class="text-xs text-gray-400 mt-1">Kies wie begint als Zoeker</p>
                     </div>
 
-                    <button id="btn-start-game" class="btn-primary w-full py-4 rounded-lg text-lg shadow-md">
+                    <button id="btn-start-game" class="btn-primary w-full py-4 rounded-lg text-lg shadow-md mb-2">
                         Start Spel 🧀
+                    </button>
+                    
+                    <!-- DEBUG BUTTON -->
+                    <button id="btn-add-bot" class="w-full py-2 bg-gray-200 text-gray-600 rounded text-sm font-bold hover:bg-gray-300 border border-gray-300 border-dashed">
+                        <i class="fas fa-robot mr-1"></i> Voeg Test-Bot toe (Debug)
                     </button>
                 </div>
             </div>
@@ -486,8 +560,8 @@
                 </div>
 
                 <!-- DYNAMIC COMMENTARY BOX -->
-                <div id="dynamic-comment-container" class="mb-4 h-8 flex items-center justify-center">
-                    <span id="dynamic-comment" class="text-lg font-bold text-pink-600 italic text-center"></span>
+                <div id="dynamic-comment-container" class="mb-4 h-auto min-h-[2rem] flex items-center justify-center">
+                    <span id="dynamic-comment" class="text-lg font-bold text-pink-600 italic text-center leading-tight p-1"></span>
                 </div>
 
                 <div class="flex gap-2">
@@ -515,34 +589,10 @@
         <div id="seeker-hint-modal" class="absolute bottom-0 left-0 right-0 bg-white p-6 rounded-t-3xl shadow-[0_-10px_40px_rgba(0,0,0,0.2)] transform translate-y-full transition-transform duration-300 z-50">
             <h3 class="text-lg font-bold text-yellow-800 mb-2">💡 Hint Gevraagd!</h3>
             <p class="text-sm text-gray-600 mb-3">Geef een hint van 1 woord.</p>
-            <div class="flex gap-2 pb-4"> <!-- Added padding for mobile bottom bar -->
+            <div class="flex gap-2 pb-4"> 
+                <button id="btn-ai-hint" class="sparkle-btn bg-purple-100 text-purple-700 border border-purple-300 px-3 rounded font-bold whitespace-nowrap"><i class="fas fa-magic"></i> AI Hint</button>
                 <input id="inp-give-hint" type="text" class="game-input flex-1 p-3 rounded" placeholder="Hint...">
-                <button id="btn-send-hint" class="bg-blue-500 text-white px-6 rounded font-bold">Stuur</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 9. NEW GAME SCREEN: DIKE PANIC -->
-    <div id="screen-game-dike" class="screen overflow-hidden select-none">
-        <div id="dike-container" class="absolute inset-0 w-full h-full cursor-crosshair touch-none"></div>
-        
-        <!-- UI Overlay -->
-        <div class="role-badge text-sm border-2 border-black" id="dike-role-display">Rol</div>
-
-        <div class="absolute bottom-6 left-4 right-4 bg-white/95 p-4 rounded-xl shadow-lg flex justify-between items-center z-50 border border-gray-200">
-            <div>
-                <p class="text-[10px] text-gray-500 font-bold uppercase">Water</p>
-                <div class="text-2xl font-bold text-blue-600" id="dike-ammo">20</div>
-            </div>
-            <div class="text-center px-2">
-                <p class="text-[10px] text-gray-500 font-bold uppercase">Gevaar</p>
-                <div class="flex gap-1 justify-center mt-1" id="dike-danger-meter">
-                    <!-- Dots injected via JS -->
-                </div>
-            </div>
-            <div class="text-right">
-                <p class="text-[10px] text-gray-500 font-bold uppercase">Status</p>
-                <div class="text-sm font-bold text-orange-600" id="dike-status">Veilig</div>
+                <button id="btn-send-hint" class="bg-blue-500 text-white px-4 rounded font-bold">Stuur</button>
             </div>
         </div>
     </div>
@@ -581,6 +631,9 @@
             appId: "1:575065794428:web:81fc2519d23da55bf3e6f9",
             measurementId: "G-7K1J5VCDG7"
         };
+        
+        // Gemini API Key (Runtime Provided)
+        const apiKey = ""; 
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -595,8 +648,11 @@
         let currentSecretWord = "";
         let spamInterval = null; 
         const appId = "ik-zie-ik-zie-manon";
-        let dikeRenderedHoles = [];
         let authTimeout = null;
+
+        // Settings State
+        let sfxEnabled = true;
+        let isDarkMode = false;
 
         // Minigame State
         let cheeseGameLoop = null;
@@ -631,7 +687,7 @@
         // Simple SFX Synthesizer
         const sfx = {
             playTone: (freq, type, duration, startTime = 0) => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
                 osc.type = type;
@@ -644,46 +700,47 @@
                 osc.stop(audioCtx.currentTime + startTime + duration);
             },
             win: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(523.25, 'triangle', 0.2, 0); // C5
                 sfx.playTone(659.25, 'triangle', 0.2, 0.2); // E5
                 sfx.playTone(783.99, 'triangle', 0.4, 0.4); // G5
                 sfx.playTone(1046.50, 'triangle', 0.6, 0.6); // C6
             },
             lose: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(150, 'sawtooth', 0.3);
             },
             wrong: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(100, 'sawtooth', 0.2);
             },
             splat: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(50, 'square', 0.1);
             },
             damage: () => {
-                 if (!audioCtx) return;
+                 if (!audioCtx || !sfxEnabled) return;
                  sfx.playTone(200, 'sawtooth', 0.3);
             },
             buy: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(880, 'sine', 0.1);
                 sfx.playTone(1760, 'sine', 0.1, 0.1);
             },
             troll: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 for(let i=0; i<5; i++) {
                     sfx.playTone(Math.random() * 800 + 200, 'square', 0.1, i * 0.1);
                 }
             },
             spam: () => {
-                if (!audioCtx) return;
+                if (!audioCtx || !sfxEnabled) return;
                 sfx.playTone(800, 'square', 0.05);
             },
-            dikeBreak: () => {
-                if (!audioCtx) return;
-                sfx.playTone(50, 'sawtooth', 1.0);
+            sparkle: () => {
+                if (!audioCtx || !sfxEnabled) return;
+                sfx.playTone(1200, 'sine', 0.1);
+                sfx.playTone(1500, 'sine', 0.1, 0.1);
             }
         };
 
@@ -697,13 +754,49 @@
             gameGuesser: document.getElementById('screen-game-guesser'),
             gameSeeker: document.getElementById('screen-game-seeker'),
             winner: document.getElementById('screen-winner'),
-            dike: document.getElementById('screen-game-dike'),
             cheeseMinigame: document.getElementById('screen-minigame-cheese')
         };
 
         // Initialize Audio on user interaction
         document.body.addEventListener('click', initAudio, { once: true });
         document.body.addEventListener('touchstart', initAudio, { once: true });
+
+        // --- GEMINI AI HELPERS ---
+        async function callGemini(promptText) {
+            try {
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: promptText }] }]
+                    })
+                });
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
+            } catch (error) {
+                console.error("Gemini AI Error:", error);
+                return null;
+            }
+        }
+
+        async function getAIComment(guess, secret) {
+            // Fallback if API fails
+            const defaultSnark = getSnarkyComment(guess, secret);
+            
+            // Only use AI if key exists (simulated check since env injects it usually)
+            if (!apiKey) return defaultSnark;
+
+            const prompt = `
+                Het spel is 'Ik zie ik zie wat jij niet ziet'. 
+                Het geheime woord is '${secret}'.
+                De speler gokte '${guess}'.
+                Geef een korte, grappige, ietwat sarcastische of bijdehante reactie (max 10 woorden) waarom dat fout is. 
+                Spreek de speler aan. Antwoord in het Nederlands.
+            `;
+            
+            const aiResponse = await callGemini(prompt);
+            return aiResponse ? aiResponse.trim() : defaultSnark;
+        }
 
         // --- Helper Functions ---
         function showScreen(screenName) {
@@ -793,6 +886,56 @@
             }
         });
 
+        // --- SETTINGS LOGIC ---
+        document.getElementById('btn-settings-toggle').addEventListener('click', () => {
+            document.getElementById('settings-popup').classList.remove('hidden');
+        });
+
+        // Volume
+        document.getElementById('inp-volume').addEventListener('input', (e) => {
+            const val = e.target.value;
+            document.getElementById('vol-display').innerText = val + '%';
+            if(bgMusic) bgMusic.volume = val / 100;
+        });
+
+        // SFX Toggle
+        document.getElementById('btn-toggle-sfx').addEventListener('click', (e) => {
+            sfxEnabled = !sfxEnabled;
+            const btn = document.getElementById('btn-toggle-sfx');
+            const dot = btn.querySelector('div');
+            if(sfxEnabled) {
+                btn.classList.remove('bg-gray-300'); btn.classList.add('bg-green-500');
+                dot.style.transform = 'translateX(0)';
+            } else {
+                btn.classList.remove('bg-green-500'); btn.classList.add('bg-gray-300');
+                dot.style.transform = 'translateX(-16px)';
+            }
+        });
+
+        // Dark Mode
+        document.getElementById('btn-toggle-dark').addEventListener('click', (e) => {
+            isDarkMode = !isDarkMode;
+            document.body.classList.toggle('dark-mode');
+            const btn = document.getElementById('btn-toggle-dark');
+            const dot = btn.querySelector('div');
+            if(isDarkMode) {
+                btn.classList.remove('bg-gray-300'); btn.classList.add('bg-indigo-500');
+                dot.style.transform = 'translateX(16px)';
+            } else {
+                btn.classList.remove('bg-indigo-500'); btn.classList.add('bg-gray-300');
+                dot.style.transform = 'translateX(0)';
+            }
+        });
+
+        // Fullscreen
+        document.getElementById('btn-fullscreen').addEventListener('click', () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+            } else {
+                if (document.exitFullscreen) document.exitFullscreen();
+            }
+        });
+
         // --- CHEESE MINIGAME LOGIC ---
         const cheeseItems = [
             { id: 1, name: "Grote Mepper", cost: 50, icon: "🏏", desc: "Groter klikbereik" },
@@ -873,7 +1016,6 @@
         function applyBoost(id) {
             if(id === 1) { // Grote Mepper
                 document.getElementById('fly-container').classList.add('cursor-crosshair'); // Visual cue
-                // Logic handled in click handler (radius)
             }
             if(id === 2) { // Deo
                 cheeseFlies.forEach(f => f.speed *= 0.5);
@@ -1027,7 +1169,7 @@
                     gameData: {
                         secretWord: "", secretColor: "#ffffff", guesses: [],
                         hintRequested: false, hintGiven: "", winner: null,
-                        trollEffect: null, trollData: null, dikeHoles: [], dikeAmmo: 20
+                        trollEffect: null, trollData: null
                     }
                 });
                 enterLobby(code);
@@ -1113,10 +1255,78 @@
             input.focus();
         }
 
+        // --- BOT LOGIC ---
+        document.getElementById('btn-add-bot').addEventListener('click', async () => {
+            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+            const snap = await getDoc(roomRef);
+            const players = snap.data().players;
+            
+            if(players.some(p => p.uid === 'bot')) return showToast("Bot is er al!");
+            if(players.length >= 2) return showToast("Kamer is vol!");
+
+            await updateDoc(roomRef, {
+                players: arrayUnion({
+                    uid: 'bot',
+                    name: 'Botje 🤖',
+                    isHost: false
+                })
+            });
+        });
+
+        // --- AI HINT BUTTON ---
+        document.getElementById('btn-ai-hint').addEventListener('click', async () => {
+             const input = document.getElementById('inp-give-hint');
+             input.placeholder = "✨ AI is aan het denken...";
+             input.disabled = true;
+             sfx.sparkle();
+             
+             // Get secret word
+             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+             const snap = await getDoc(roomRef);
+             const secret = snap.data().gameData.secretWord;
+
+             const prompt = `Het geheime woord is '${secret}'. Bedenk een cryptische, korte hint van max 1 zin voor het spel 'Ik zie ik zie wat jij niet ziet'. Antwoord in het Nederlands.`;
+             const hint = await callGemini(prompt);
+             
+             input.disabled = false;
+             if(hint) {
+                 input.value = hint.trim();
+                 input.focus();
+             } else {
+                 input.placeholder = "Fout bij AI...";
+                 showToast("AI kon even niet denken!");
+             }
+        });
+
         // --- Game State Handler ---
         function handleRoomUpdate(data) {
             const players = data.players;
             currentSecretWord = data.gameData.secretWord;
+
+            // BOT LOGIC: Ran by Host Only
+            const amHost = players.find(p => p.uid === currentUser.uid)?.isHost;
+            const hasBot = players.some(p => p.uid === 'bot');
+
+            if (amHost && hasBot) {
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                
+                // Bot as Seeker Logic
+                if (data.status === 'setup' && data.seekerId === 'bot' && !data.gameData.secretWord) {
+                     // Set word after small delay
+                     setTimeout(async () => {
+                         const words = ['Kaas', 'Appel', 'Banaan', 'Auto', 'Wolk'];
+                         const randomWord = words[Math.floor(Math.random() * words.length)];
+                         if(data.status === 'setup') { // Check again
+                             await updateDoc(roomRef, { 
+                                 status: 'playing', 
+                                 'gameData.secretWord': randomWord, 
+                                 'gameData.secretColor': '#fbbf24' 
+                             });
+                         }
+                     }, 2000);
+                }
+            }
+
 
             // Chat Rendering
             const chatMessages = data.chat || [];
@@ -1131,7 +1341,6 @@
                     // Notification Logic
                     const popup = document.getElementById('chat-popup');
                     if(popup.classList.contains('hidden') && lastMsg.uid !== currentUser.uid) {
-                        // Check if this is a new message since last check (simple version: just show dot)
                         document.getElementById('chat-notification').classList.remove('hidden');
                     }
 
@@ -1147,7 +1356,7 @@
                 }
             }
             
-            // ... rest of handleRoomUpdate logic ...
+            // LOBBY STATE
             if (data.status === 'waiting') {
                 showScreen('lobby'); 
                 document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
@@ -1158,10 +1367,11 @@
                         <span class="font-medium text-gray-700">${p.name} ${p.uid === currentUser.uid ? '(Jij)' : ''}</span>
                     </div>`
                 ).join('');
-                const amHost = players.find(p => p.uid === currentUser.uid)?.isHost;
+                
                 const hostControls = document.getElementById('host-controls');
                 const waitingMsg = document.getElementById('waiting-msg');
                 const selSeeker = document.getElementById('sel-seeker');
+                
                 if (players.length === 2) {
                     if (amHost) {
                         hostControls.classList.remove('hidden');
@@ -1175,9 +1385,35 @@
                         waitingMsg.innerText = "De host kiest de instellingen...";
                     }
                 } else {
-                    hostControls.classList.add('hidden');
-                    waitingMsg.classList.remove('hidden');
-                    waitingMsg.innerText = "Wachten op speler 2...";
+                    // LESS THAN 2 PLAYERS
+                    if (amHost) {
+                         // Show Add Bot Button
+                         hostControls.classList.add('hidden'); 
+                         document.getElementById('host-controls').classList.remove('hidden'); 
+                         waitingMsg.classList.remove('hidden');
+                         waitingMsg.innerText = "Wachten op speler 2...";
+                         
+                         const botBtn = document.getElementById('btn-add-bot');
+                         if(botBtn) {
+                             botBtn.style.display = 'block'; 
+                             hostControls.classList.remove('hidden');
+                             document.getElementById('btn-start-game').classList.add('hidden');
+                             document.getElementById('sel-gamemode').parentElement.classList.add('hidden'); // hide settings
+                             document.getElementById('sel-seeker').parentElement.classList.add('hidden');
+                         }
+                    } else {
+                        hostControls.classList.add('hidden');
+                        waitingMsg.classList.remove('hidden');
+                        waitingMsg.innerText = "Wachten op speler 2...";
+                    }
+                }
+
+                // If players = 2, show start game, hide add bot
+                if (players.length === 2 && amHost) {
+                     document.getElementById('btn-start-game').classList.remove('hidden');
+                     document.getElementById('btn-add-bot').classList.add('hidden');
+                     document.getElementById('sel-gamemode').parentElement.classList.remove('hidden');
+                     document.getElementById('sel-seeker').parentElement.classList.remove('hidden');
                 }
             }
             if (data.status === 'setup') {
@@ -1197,10 +1433,9 @@
                 if (data.gameMode === 'classic') {
                     if (myRole === 'seeker') { updateSeekerScreen(data); showScreen('gameSeeker'); }
                     else { updateGuesserScreen(data); showScreen('gameGuesser'); }
-                } else if (data.gameMode === 'dike') { updateDikeScreen(data); showScreen('dike'); }
+                }
             }
             if (data.status === 'finished') {
-                // Check if this is a fresh finish to play sound only once
                 const previousStatus = document.getElementById('screen-winner').classList.contains('active') ? 'finished' : 'playing';
                 if (previousStatus !== 'finished') {
                     sfx.win();
@@ -1214,15 +1449,6 @@
                     document.getElementById('winner-icon').innerText = "🎉";
                     document.getElementById('end-word').innerText = data.gameData.secretWord;
                     document.getElementById('classic-end-info').classList.remove('hidden');
-                } else {
-                    document.getElementById('classic-end-info').classList.add('hidden');
-                    if (data.gameData.winner === data.seekerId) {
-                        document.getElementById('winner-icon').innerText = "🌊";
-                        document.getElementById('winner-text').innerText = "Nederland is overstroomd! De Zee wint!";
-                    } else {
-                        document.getElementById('winner-icon').innerText = "🌷";
-                        document.getElementById('winner-text').innerText = "Droge voeten! Hans Brinker wint!";
-                    }
                 }
                 showScreen('winner');
             }
@@ -1238,7 +1464,6 @@
                 'gameData.guesses': [], 'gameData.hintRequested': false, 'gameData.hintGiven': "",
                 'gameData.trollEffect': null, 'gameData.winner': null
             };
-            if (gameMode === 'dike') { updateData['gameData.dikeHoles'] = []; updateData['gameData.dikeAmmo'] = 20; }
             await updateDoc(roomRef, updateData);
         });
 
@@ -1360,8 +1585,10 @@
             if (guess.toLowerCase() === gameData.secretWord.toLowerCase()) {
                 await updateDoc(roomRef, { status: 'finished', 'gameData.winner': currentUser.uid, 'gameData.winnerName': currentUser.displayName || "De Rader" });
             } else {
-                // Show Dynamic Comment (Local only)
-                const comment = getSnarkyComment(guess, gameData.secretWord);
+                // Show AI Dynamic Comment (Local only first, then async update if desired, or await)
+                // Let's await for better effect since it replaces local logic
+                showDynamicComment("Even denken..."); // Loading state
+                const comment = await getAIComment(guess, gameData.secretWord);
                 showDynamicComment(comment);
                 
                 // Play wrong sound locally for immediate feedback
@@ -1375,95 +1602,6 @@
                 await updateDoc(roomRef, { 'gameData.guesses': arrayUnion(guess) });
             }
         });
-
-        // --- DIKE PANIC LOGIC ---
-        function updateDikeScreen(data) {
-            const container = document.getElementById('dike-container');
-            const roleDisplay = document.getElementById('dike-role-display');
-            const ammoDisplay = document.getElementById('dike-ammo');
-            const statusDisplay = document.getElementById('dike-status');
-            const dangerMeter = document.getElementById('dike-danger-meter');
-            const holes = data.gameData.dikeHoles || [];
-            const ammo = data.gameData.dikeAmmo;
-
-            if (myRole === 'seeker') {
-                roleDisplay.innerText = "🌊 JIJ BENT DE ZEE";
-                container.className = "absolute inset-0 w-full h-full cursor-crosshair water-bg";
-                roleDisplay.className = "role-badge text-blue-800 border-2 border-blue-500";
-            } else {
-                roleDisplay.innerText = "🧱 JIJ BENT HANS BRINKER";
-                container.className = "absolute inset-0 w-full h-full cursor-pointer dike-bg";
-                roleDisplay.className = "role-badge text-orange-800 border-2 border-orange-500";
-            }
-            ammoDisplay.innerText = `${ammo}/20`;
-            const dangerLevel = holes.length;
-            dangerMeter.innerHTML = '';
-            for(let i=0; i<5; i++) {
-                const dot = document.createElement('div');
-                dot.className = `w-4 h-4 rounded-full border border-gray-400 ${i < dangerLevel ? 'bg-red-600 animate-ping' : 'bg-gray-200'}`;
-                dangerMeter.appendChild(dot);
-            }
-            if (dangerLevel >= 3) {
-                statusDisplay.innerText = "KRITIEK!";
-                document.body.classList.add('shake-hard'); // Shake on danger
-                sfx.playTone(100, 'sawtooth', 0.2); // Constant buzzing warning
-            } else if (dangerLevel > 0) {
-                statusDisplay.innerText = "Lekkage!";
-                document.body.classList.remove('shake-hard');
-            } else {
-                statusDisplay.innerText = "Veilig";
-                document.body.classList.remove('shake-hard');
-            }
-
-            container.innerHTML = ''; 
-            holes.forEach(hole => {
-                const h = document.createElement('div');
-                h.className = "dike-hole"; h.style.top = hole.y + '%'; h.style.left = hole.x + '%'; h.innerHTML = "💧";
-                if (myRole === 'guesser') { h.onclick = (e) => { e.stopPropagation(); fixDikeHole(hole); }; }
-                container.appendChild(h);
-            });
-            
-            // SFX on new holes
-            if(holes.length > dikeRenderedHoles.length) {
-                sfx.wrong(); // Splash sound placeholder
-            }
-
-            dikeRenderedHoles = holes;
-            if (dangerLevel >= 5) {
-                sfx.dikeBreak();
-                endDikeGame(data.seekerId, "De Zee");
-            } else if (ammo <= 0 && dangerLevel === 0) { 
-                const hans = data.players.find(p => p.uid !== data.seekerId); 
-                endDikeGame(hans.uid, "Hans Brinker"); 
-            }
-        }
-
-        async function endDikeGame(winnerId, winnerName) {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-            const snap = await getDoc(roomRef);
-            if(snap.data().status === 'finished') return; 
-            await updateDoc(roomRef, { status: 'finished', 'gameData.winner': winnerId, 'gameData.winnerName': winnerName });
-        }
-
-        document.getElementById('dike-container').addEventListener('click', async (e) => {
-            if (myRole !== 'seeker') return; 
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-            const snap = await getDoc(roomRef); const data = snap.data();
-            if (data.status !== 'playing' || data.gameMode !== 'dike') return;
-            if (data.gameData.dikeAmmo <= 0) return showToast("Je water is op!");
-            if ((data.gameData.dikeHoles || []).length >= 5) return; 
-            const rect = e.target.getBoundingClientRect();
-            const x = ((e.clientX - rect.left) / rect.width) * 90; const y = ((e.clientY - rect.top) / rect.height) * 90;
-            const newHole = { id: Date.now(), x: Math.max(5, x), y: Math.max(5, y) }; 
-            await updateDoc(roomRef, { 'gameData.dikeHoles': [...(data.gameData.dikeHoles || []), newHole], 'gameData.dikeAmmo': data.gameData.dikeAmmo - 1 });
-        });
-
-        async function fixDikeHole(holeToRemove) {
-            const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
-            const snap = await getDoc(roomRef);
-            const updatedHoles = (snap.data().gameData.dikeHoles || []).filter(h => h.id !== holeToRemove.id);
-            await updateDoc(roomRef, { 'gameData.dikeHoles': updatedHoles });
-        }
 
         // --- SHARED BUTTONS ---
         document.getElementById('btn-request-hint').addEventListener('click', async () => {
@@ -1479,8 +1617,7 @@
             await updateDoc(roomRef, {
                 status: 'waiting', 'gameData.secretWord': '', 'gameData.secretColor': '#ffffff', 'gameData.guesses': [],
                 'gameData.hintRequested': false, 'gameData.hintGiven': '', 'gameData.winner': null, 'gameData.winnerName': null,
-                'gameData.trollEffect': null, 'gameData.dikeHoles': [], 'gameData.dikeAmmo': 20,
-                'chat': [] // Optional: clear chat on reset
+                'gameData.trollEffect': null
             });
             renderedGuessesCount = 0; document.getElementById('wrong-guesses-container').innerHTML = "";
             document.getElementById('inp-guess').value = ""; document.getElementById('inp-secret-word').value = ""; document.getElementById('inp-give-hint').value = "";
