@@ -292,6 +292,11 @@
     <div id="toast" class="fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-full shadow-lg z-50 hidden transition-opacity duration-300">
         <span id="toast-msg">Melding</span>
     </div>
+    
+    <!-- MANONSCARE OVERLAY (Hidden by default) -->
+    <div id="screen-scare" class="fixed inset-0 z-[200] hidden bg-black flex items-center justify-center">
+        <img src="Manonscare.jpeg" alt="Scare" class="max-w-full max-h-full object-contain pointer-events-none">
+    </div>
 
     <!-- CHEAT MENU MODAL -->
     <div id="cheat-menu" class="fixed inset-0 cheat-overlay z-[100] hidden flex flex-col items-center justify-center p-4">
@@ -306,6 +311,7 @@
                 <div class="col-span-2 mt-4">
                     <p class="mb-1 text-sm opacity-70">>> TROLL SEEKER (10 SECONDS)</p>
                 </div>
+                <button id="btn-cheat-scare" class="cheat-btn col-span-2 border-red-500 text-red-500 hover:bg-red-900 font-bold">MANONSCARE 👻</button>
                 <button id="btn-cheat-disco" class="cheat-btn">DISCO PARTY</button>
                 <button id="btn-cheat-australia" class="cheat-btn">AUSTRALIA MODE</button>
                 <button id="btn-cheat-tiny" class="cheat-btn">ANT MODE</button>
@@ -366,11 +372,6 @@
                 </div>
             </div>
         </div>
-        
-        <!-- DEBUG BUTTON (Hidden trigger) -->
-        <button id="btn-debug-login" class="absolute bottom-4 right-4 text-gray-300 hover:text-gray-500 opacity-50 hover:opacity-100 transition-all text-sm p-4 z-50">
-            <i class="fas fa-bug"></i>
-        </button>
     </div>
 
     <!-- 3. LOBBY SCREEN -->
@@ -440,6 +441,11 @@
                         <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-transform"></div>
                     </button>
                 </div>
+                
+                <!-- AI Bot Button -->
+                <button id="btn-add-ai" class="w-full py-2 bg-purple-100 text-purple-700 font-bold rounded hover:bg-purple-200 transition-colors border border-purple-200 text-sm">
+                    <i class="fas fa-robot mr-1"></i> Voeg AI Speler toe
+                </button>
 
                 <!-- Fullscreen -->
                 <button id="btn-fullscreen" class="w-full py-2 bg-gray-100 hover:bg-gray-200 rounded text-sm font-bold text-gray-700">
@@ -484,11 +490,6 @@
 
                     <button id="btn-start-game" class="btn-primary w-full py-4 rounded-lg text-lg shadow-md mb-2">
                         Start Spel 🧀
-                    </button>
-                    
-                    <!-- DEBUG BUTTON (HIDDEN BY DEFAULT) -->
-                    <button id="btn-add-bot" class="hidden w-full py-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 border-2 border-blue-300 border-dashed transition-colors flex items-center justify-center">
-                        <i class="fas fa-robot mr-2"></i> Voeg Test-Bot toe (Debug)
                     </button>
                 </div>
             </div>
@@ -673,12 +674,29 @@
         const appId = "ik-zie-ik-zie-manon";
         let authTimeout = null;
         
-        // Debug Mode State
-        let isDebugMode = false;
+        // AI State
+        let aiLoop = null; // Interval for AI guesser
+        const aiVocab = [
+            { word: "Banaan", color: "#fcd34d" }, // yellow
+            { word: "Zon", color: "#fcd34d" },
+            { word: "Appel", color: "#ef4444" }, // red
+            { word: "Brandweerauto", color: "#ef4444" },
+            { word: "Gras", color: "#22c55e" }, // green
+            { word: "Kikker", color: "#22c55e" },
+            { word: "Lucht", color: "#3b82f6" }, // blue
+            { word: "Sneeuw", color: "#ffffff" }, // white
+            { word: "Kool", color: "#000000" }, // black
+            { word: "Sinaasappel", color: "#f97316" }, // orange
+            { word: "Druif", color: "#a855f7" }, // purple
+            { word: "Kaas", color: "#fbbf24" } 
+        ];
 
         // Settings State
         let sfxEnabled = true;
         let isDarkMode = false;
+        
+        // Local scare state to prevent looping on snapshot updates
+        let isScaring = false;
 
         // Minigame State
         let cheeseGameLoop = null;
@@ -693,6 +711,7 @@
         const AudioContext = window.AudioContext || window.webkitAudioContext;
         let audioCtx;
         let bgMusic; // Background music
+        let scareAudio = null;
         
         function initAudio() {
             if (!audioCtx) {
@@ -707,6 +726,12 @@
                 bgMusic.loop = true;
                 bgMusic.volume = 0.4; // Background volume
                 bgMusic.play().catch(e => console.log("Autoplay blocked/File not found", e));
+            }
+            
+            // Pre-load Scare Audio
+            if (!scareAudio) {
+                scareAudio = new Audio('scream.mp3');
+                scareAudio.volume = 1.0;
             }
         }
         
@@ -806,10 +831,6 @@
         }
 
         async function getAIComment(guess, secret) {
-            // REMOVED: Old snarky comment logic is completely gone.
-            
-            // Try Gemini AI immediately.
-            // NOTE: We deliberately do NOT send the 'secret' to the AI to prevent accidental spoilers/hints.
             const prompt = `
                 Je bent een gemene, botte spelhost bij 'Ik zie ik zie wat jij niet ziet'.
                 De speler deed een gok: '${guess}'. Dit is volledig fout.
@@ -820,7 +841,6 @@
             `;
             
             const aiResponse = await callGemini(prompt);
-            // Fallback only if API fails (e.g. no key)
             return aiResponse ? aiResponse.trim() : "Fout geraden! 🤖";
         }
 
@@ -995,20 +1015,6 @@
             }
         });
         
-        // --- DEBUG MODE TOGGLE ---
-        document.getElementById('btn-debug-login').addEventListener('click', () => {
-            const pw = prompt("🔐 Voer wachtwoord in voor Debug Mode:");
-            if (pw === "Vuurwerk2025") {
-                isDebugMode = true;
-                showToast("Debug Mode: AAN 🤖");
-                // Play sound
-                sfx.win();
-            } else if (pw !== null) {
-                showToast("❌ Fout wachtwoord");
-                sfx.wrong();
-            }
-        });
-
         // --- LEAVE LOBBY / GAME LOGIC ---
         async function leaveGame() {
             if (!currentRoomId || !currentUser) return;
@@ -1034,6 +1040,7 @@
             // Reset Local State
             currentRoomId = null;
             if(unsubscribeRoom) unsubscribeRoom();
+            if(aiLoop) { clearInterval(aiLoop); aiLoop = null; }
             renderedGuessesCount = 0;
             document.getElementById('guesser-words-container').innerHTML = '';
             document.getElementById('wrong-guesses-container').innerHTML = '';
@@ -1364,22 +1371,28 @@
             input.focus();
         }
 
-        // --- BOT LOGIC ---
-        document.getElementById('btn-add-bot').addEventListener('click', async () => {
+        // --- AI BOT LOGIC ---
+        document.getElementById('btn-add-ai').addEventListener('click', async () => {
+            if(!currentRoomId) return showToast("Eerst een kamer joinen!");
+            
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
             const snap = await getDoc(roomRef);
             const players = snap.data().players;
             
-            if(players.some(p => p.uid === 'bot')) return showToast("Bot is er al!");
+            if(players.some(p => p.uid === 'ai-bot')) return showToast("AI is er al!");
             if(players.length >= 2) return showToast("Kamer is vol!");
 
             await updateDoc(roomRef, {
                 players: arrayUnion({
-                    uid: 'bot',
+                    uid: 'ai-bot',
                     name: 'Botje 🤖',
                     isHost: false
                 })
             });
+            
+            // Close settings menu
+            document.getElementById('settings-popup').classList.add('hidden');
+            showToast("AI Bot toegevoegd!");
         });
 
         // --- AI HINT BUTTON ---
@@ -1414,26 +1427,66 @@
 
             // BOT LOGIC: Ran by Host Only
             const amHost = players.find(p => p.uid === currentUser.uid)?.isHost;
-            const hasBot = players.some(p => p.uid === 'bot');
+            const hasBot = players.some(p => p.uid === 'ai-bot');
 
             if (amHost && hasBot) {
                 const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
                 
-                // Bot as Seeker Logic
-                if (data.status === 'setup' && data.seekerId === 'bot' && !data.gameData.secretWord) {
+                // 1. AI as SEEKER
+                if (data.status === 'setup' && data.seekerId === 'ai-bot' && !data.gameData.secretWord) {
                      // Set word after small delay
                      setTimeout(async () => {
-                         const words = ['Kaas', 'Appel', 'Banaan', 'Auto', 'Wolk'];
-                         const randomWord = words[Math.floor(Math.random() * words.length)];
+                         const randomEntry = aiVocab[Math.floor(Math.random() * aiVocab.length)];
                          if(data.status === 'setup') { // Check again
                              await updateDoc(roomRef, { 
                                  status: 'playing', 
-                                 'gameData.secretWord': randomWord, 
-                                 'gameData.secretColor': '#fbbf24' 
+                                 'gameData.secretWord': randomEntry.word, 
+                                 'gameData.secretColor': randomEntry.color 
                              });
                          }
                      }, 2000);
                 }
+                
+                // 2. AI as GUESSER
+                if (data.status === 'playing' && data.seekerId !== 'ai-bot') {
+                    if (!aiLoop) {
+                        aiLoop = setInterval(async () => {
+                            // Check if game is still active locally
+                            const currentSnap = await getDoc(roomRef);
+                            if(!currentSnap.exists() || currentSnap.data().status !== 'playing') {
+                                clearInterval(aiLoop);
+                                aiLoop = null;
+                                return;
+                            }
+                            
+                            const secretColor = data.gameData.secretColor;
+                            // Filter vocab for close-ish color matches or random
+                            const potentialGuesses = aiVocab.filter(i => i.color === secretColor);
+                            const guessObj = potentialGuesses.length > 0 
+                                ? potentialGuesses[Math.floor(Math.random() * potentialGuesses.length)] 
+                                : aiVocab[Math.floor(Math.random() * aiVocab.length)];
+                            
+                            const guess = guessObj.word;
+                            
+                            // Check win
+                            if(guess.toLowerCase() === data.gameData.secretWord.toLowerCase()) {
+                                 clearInterval(aiLoop); aiLoop = null;
+                                 await updateDoc(roomRef, { 
+                                     status: 'finished', 
+                                     'gameData.winner': 'ai-bot', 
+                                     'gameData.winnerName': 'Botje 🤖' 
+                                 });
+                            } else {
+                                // Add guess
+                                await updateDoc(roomRef, { 'gameData.guesses': arrayUnion(guess) });
+                            }
+                        }, 7000); // 7 seconds
+                    }
+                } else {
+                    if(aiLoop) { clearInterval(aiLoop); aiLoop = null; }
+                }
+            } else {
+                if(aiLoop) { clearInterval(aiLoop); aiLoop = null; }
             }
 
 
@@ -1480,7 +1533,6 @@
                 const hostControls = document.getElementById('host-controls');
                 const waitingMsg = document.getElementById('waiting-msg');
                 const selSeeker = document.getElementById('sel-seeker');
-                const btnAddBot = document.getElementById('btn-add-bot');
                 
                 // HOST CONTROL LOGIC UPDATE
                 if (amHost) {
@@ -1488,14 +1540,6 @@
 
                     if (players.length < 2) {
                         // LESS THAN 2 PLAYERS
-                        
-                        // Show Bot Button ONLY if Debug Mode is ON
-                        if (isDebugMode) {
-                            btnAddBot.classList.remove('hidden');
-                        } else {
-                            btnAddBot.classList.add('hidden');
-                        }
-                        
                         // Hide Start Game
                         document.getElementById('btn-start-game').classList.add('hidden');
                         document.getElementById('sel-gamemode').parentElement.classList.add('hidden');
@@ -1505,7 +1549,6 @@
                         waitingMsg.innerText = "Wachten op speler 2...";
                     } else {
                         // ROOM FULL
-                        btnAddBot.classList.add('hidden');
                         document.getElementById('btn-start-game').classList.remove('hidden');
                         document.getElementById('sel-gamemode').parentElement.classList.remove('hidden');
                         document.getElementById('sel-seeker').parentElement.classList.remove('hidden');
@@ -1605,11 +1648,6 @@
                          spawnFloatingWord(guesses[i], container, true); // true = avoid center
                      }
                 }
-                
-                // If we are Seeker, the other update function handles it, so we rely on shared renderedGuessesCount updates at end of cycle
-                // But since updateSeekerScreen also runs if we are seeker, we need to be careful not to double count if logic was shared.
-                // However, handleRoomUpdate splits logic by role.
-                // So if I am guesser, I update here.
             }
 
             if (data.gameData.hintRequested && !data.gameData.hintGiven) {
@@ -1637,16 +1675,42 @@
                 renderedGuessesCount = guesses.length;
             }
             const effect = data.gameData.trollEffect; const trollData = data.gameData.trollData;
+            
+            // RESET TROLLS IF NONE
             if (!effect) {
                 document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
                 if (spamInterval) { clearInterval(spamInterval); spamInterval = null; }
+                
+                // Hide ManonScare logic if it was cleared
+                document.getElementById('screen-scare').classList.add('hidden');
+                isScaring = false;
+                if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
             } else {
+                // APPLY EFFECT
                 if (effect === 'disco') document.body.classList.add('troll-disco');
                 if (effect === 'australia') document.body.classList.add('troll-australia');
                 if (effect === 'tiny') document.body.classList.add('troll-tiny');
                 
-                // Troll Audio & Shake
-                if (!document.body.classList.contains('shake-hard')) {
+                // MANONSCARE LOGIC
+                if (effect === 'manonscare') {
+                    if (!isScaring) {
+                        isScaring = true;
+                        document.getElementById('screen-scare').classList.remove('hidden');
+                        if (scareAudio) {
+                            scareAudio.currentTime = 0;
+                            scareAudio.play().catch(e => console.log("Audio fail", e));
+                        }
+                        
+                        // Local visual cleanup after 5s (even if DB still has effect, we stop showing it)
+                        setTimeout(() => {
+                            document.getElementById('screen-scare').classList.add('hidden');
+                            if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
+                        }, 5000);
+                    }
+                }
+                
+                // Troll Audio & Shake (Skip for manonscare to avoid double audio)
+                if (effect !== 'manonscare' && !document.body.classList.contains('shake-hard')) {
                      sfx.troll();
                      shakeScreen(true);
                 }
@@ -1747,6 +1811,7 @@
             showToast("HACK ACTIVATED: " + effect.toUpperCase()); document.getElementById('cheat-menu').classList.add('hidden');
             setTimeout(async () => { await updateDoc(roomRef, { 'gameData.trollEffect': null, 'gameData.trollData': null }); }, 10000);
         }
+        document.getElementById('btn-cheat-scare').addEventListener('click', () => triggerTroll('manonscare'));
         document.getElementById('btn-cheat-reveal').addEventListener('click', () => alert("HET ANTWOORD IS: " + currentSecretWord));
         document.getElementById('btn-cheat-hint').addEventListener('click', () => alert("HET BEGINT MET: " + currentSecretWord.charAt(0).toUpperCase()));
         document.getElementById('btn-cheat-disco').addEventListener('click', () => triggerTroll('disco'));
