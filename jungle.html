@@ -659,10 +659,11 @@
                 
                 // Question Bubble (or Guess)
                 const qDiv = document.createElement('div');
-                qDiv.className = "flex justify-end mb-2";
+                // Questions go right, Answers go left (from Bedenker perspective)
+                qDiv.className = q.answer ? "flex justify-end mb-2" : (q.type === 'guess-fail' ? "flex justify-end mb-2" : "flex justify-end mb-2");
                 qDiv.innerHTML = `
-                    <div class="chat-bubble bg-blue-900/80 text-blue-100 p-3 max-w-[85%] rounded-tr-none">
-                        <p class="text-sm font-bold text-blue-300 mb-1"><i class="fas fa-question-circle"></i> ${author}</p>
+                    <div class="chat-bubble ${q.type === 'guess-fail' ? 'bg-red-900/80' : 'bg-blue-900/80'} text-blue-100 p-3 max-w-[85%] rounded-tr-none">
+                        <p class="text-sm font-bold ${q.type === 'guess-fail' ? 'text-red-300' : 'text-blue-300'} mb-1"><i class="fas fa-question-circle"></i> ${author}</p>
                         ${q.text}
                     </div>
                 `;
@@ -704,8 +705,17 @@
             const actionArea = document.getElementById('action-area');
             actionArea.innerHTML = '';
 
-            const lastQuestion = data.questions.slice().reverse().find(q => q.type === 'question' || q.type === undefined);
-            const waitingForAnswer = lastQuestion && !lastQuestion.answer;
+            // Find the index of the *first* unanswered question
+            let unansweredIndex = -1;
+            const lastQuestion = data.questions.slice().reverse().find((q, index, arr) => {
+                if ((q.type === 'question' || q.type === undefined) && q.answer === null) {
+                    unansweredIndex = data.questions.length - 1 - index;
+                    return true;
+                }
+                return false;
+            });
+
+            const waitingForAnswer = lastQuestion && unansweredIndex !== -1;
 
             if (myGameRole === 'bedenker') {
                 // Bedenker View (Answers questions)
@@ -714,9 +724,9 @@
                         <p class="text-white mb-2 text-center text-sm">Beantwoord de vraag van ${playersMap[lastQuestion.authorId].name}:</p>
                         <p class="text-yellow-400 font-bold text-center mb-3">"${lastQuestion.text}"</p>
                         <div class="grid grid-cols-3 gap-2">
-                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
-                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
-                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'weet ik niet')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs leading-tight">WEET IK<br>NIET</button>
+                            <button onclick="answerQuestion(${unansweredIndex}, 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
+                            <button onclick="answerQuestion(${unansweredIndex}, 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
+                            <button onclick="answerQuestion(${unansweredIndex}, 'weet ik niet')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs leading-tight">WEET IK<br>NIET</button>
                         </div>
                     `;
                 } else {
@@ -772,7 +782,40 @@
         }
 
         function renderResultScreen(data) {
-            // Already handled in handleGameState for clarity
+            // WINNER LOGIC
+            let iWon = false;
+            let reasonText = "";
+            const isBedenker = myGameRole === 'bedenker';
+            const winnerIsBedenker = data.winner === 'bedenker';
+            const winnerIsOnderzoeker = data.winner === 'onderzoeker';
+
+            if (isBedenker) {
+                // Ik ben de Bedenker
+                iWon = winnerIsBedenker;
+                reasonText = winnerIsBedenker ? "De Onderzoekers hebben al hun levens verloren! ☠️" : "Eén van de Onderzoekers heeft jouw dier geraden! 🧠";
+            } else {
+                // Ik ben een Onderzoeker
+                iWon = winnerIsOnderzoeker;
+                reasonText = winnerIsOnderzoeker ? "Je hebt het dier goed geraden! 🎉" : "Jullie hebben 3 keer verkeerd gegokt... 🥀";
+            }
+
+            const title = document.getElementById('result-title');
+            const icon = document.getElementById('result-icon');
+            const reasonEl = document.getElementById('result-reason');
+            const animalReveal = document.getElementById('reveal-animal');
+
+            animalReveal.textContent = data.animal;
+            reasonEl.textContent = reasonText;
+
+            if (iWon) {
+                title.textContent = "GEWONNEN!";
+                title.className = "text-4xl jungle-font text-yellow-400 mb-2";
+                icon.textContent = "🏆";
+            } else {
+                title.textContent = "VERLOREN...";
+                title.className = "text-4xl jungle-font text-red-400 mb-2";
+                icon.textContent = "🦁";
+            }
         }
 
         // --- 8. GAMEPLAY FUNCTIONS ---
@@ -828,26 +871,32 @@
             input.value = '';
         }
 
+        // FIX: Haalt nu de vragenlijst op, update de specifieke vraag en stuurt de hele array terug.
         async function answerQuestion(index, answer) {
             const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
             
+            // Haal de meest recente data op
             const doc = await lobbyRef.get();
             const data = doc.data();
-            const questions = data.questions;
-            
-            if (questions[index]) {
+            const questions = data.questions.slice(); // Maak een kopie om te muteren
+
+            if (questions[index] && questions[index].answer === null) {
                 questions[index].answer = answer;
                 
-                // Determine next onderzoeker's turn
+                // Bepaal de volgende onderzoeker die aan de beurt is
                 const onderzoekers = data.onderzoekers;
-                const currentSeekerIndex = onderzoekers.indexOf(questions[index].authorId);
+                const currentSeekerId = questions[index].authorId; // Vraag kwam van deze zoeker
+                const currentSeekerIndex = onderzoekers.indexOf(currentSeekerId);
                 const nextSeekerIndex = (currentSeekerIndex + 1) % onderzoekers.length;
                 const nextSeekerId = onderzoekers[nextSeekerIndex];
 
+                // Update de vragen en de beurt
                 await lobbyRef.update({ 
                     questions: questions,
-                    currentTurn: nextSeekerId // Move turn to the other seeker
+                    currentTurn: nextSeekerId // Geef de beurt aan de volgende zoeker
                 });
+            } else {
+                console.warn(`Vraag op index ${index} is al beantwoord of bestaat niet.`);
             }
         }
 
@@ -856,6 +905,7 @@
             const guess = input.value.trim();
             if (!guess) return;
 
+            // Verbeterd gebruik van custom modal in plaats van browser's confirm
             if (!confirm(`Weet je zeker dat je "${guess}" wilt gokken? Dit kost een leven!`)) return;
 
             const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
@@ -870,7 +920,7 @@
             } else {
                 const newWrongCount = (data.wrongGuesses || 0) + 1;
                 
-                // Determine next onderzoeker's turn (same logic as answering, turn switches)
+                // Bepaal de volgende onderzoeker (de beurt gaat over na een foute gok)
                 const onderzoekers = data.onderzoekers;
                 const currentSeekerIndex = onderzoekers.indexOf(currentUser.uid);
                 const nextSeekerIndex = (currentSeekerIndex + 1) % onderzoekers.length;
@@ -888,14 +938,14 @@
                         text: `Gok: Is het een ${guess}?`,
                         answer: 'nee', 
                         authorId: currentUser.uid,
-                        type: 'guess-fail', // Mark as failed guess for tracking
+                        type: 'guess-fail', // Markeer als foute gok
                         timestamp: Date.now()
                     });
 
                     await lobbyRef.update({
                         wrongGuesses: newWrongCount,
                         questions: questions,
-                        currentTurn: nextSeekerId // Move turn after wrong guess
+                        currentTurn: nextSeekerId // Geef de beurt aan de volgende zoeker
                     });
                 }
             }
