@@ -25,7 +25,7 @@
             font-family: 'Cinzel', serif;
         }
 
-        /* De Achtergrondlaag (tavern.html) */
+        /* De Achtergrondlaag (tavern.png) */
         .background-layer {
             position: fixed;
             top: 0;
@@ -34,6 +34,7 @@
             height: 100%;
             border: none;
             z-index: 0; /* Helemaal achteraan */
+            object-fit: cover; /* Zorgt dat de afbeelding mooi schaalt en het scherm vult */
         }
 
         /* Perkament Stijl voor het menu (de 'gele doos' uit je schets) */
@@ -44,7 +45,7 @@
             border-radius: 8px;
             border: 2px solid #d7c496;
             position: relative;
-            z-index: 10; /* Bovenop de iframe */
+            z-index: 10; /* Bovenop de afbeelding */
             width: 90%;
             max-width: 400px;
             padding: 2rem;
@@ -94,8 +95,8 @@
 </head>
 <body>
 
-    <!-- 1. De Achtergrond (Jouw lokale tavern.html) -->
-    <iframe src="tavern.html" class="background-layer" title="Tavern Background"></iframe>
+    <!-- 1. De Achtergrond (Jouw lokale tavern.png) -->
+    <img src="tavern.png" class="background-layer" alt="Tavern Background">
 
     <!-- 2. De Titel (Zoals op de schets 'titel') -->
     <h1 class="main-title">De Oude Herberg</h1>
