@@ -783,12 +783,14 @@
             // REMOVED: Old snarky comment logic is completely gone.
             
             // Try Gemini AI immediately.
+            // NOTE: We deliberately do NOT send the 'secret' to the AI to prevent accidental spoilers/hints.
             const prompt = `
-                Het spel is 'Ik zie ik zie wat jij niet ziet'. 
-                Het geheime woord is '${secret}'.
-                De speler gokte '${guess}'.
-                Geef een korte, grappige, ietwat sarcastische of bijdehante reactie (max 10 woorden) waarom dat fout is. 
-                Spreek de speler aan. Antwoord in het Nederlands.
+                Je bent een gemene, botte spelhost bij 'Ik zie ik zie wat jij niet ziet'.
+                De speler deed een gok: '${guess}'. Dit is volledig fout.
+                Opdracht: Brand de speler af. Wees sarcastisch, bijdehand en meedogenloos.
+                Zeg bijvoorbeeld dat ze een bril nodig hebben of dat de gok nergens op slaat.
+                Geef GEEN hints. Noem het echte woord NIET.
+                Max 12 woorden. Nederlands.
             `;
             
             const aiResponse = await callGemini(prompt);
