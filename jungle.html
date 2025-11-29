@@ -68,9 +68,33 @@
             opacity: 0.1;
             pointer-events: none;
         }
+
+        /* Lion Fact Animation */
+        @keyframes popUp {
+            0% { transform: translateY(100%); opacity: 0; }
+            10% { transform: translateY(0); opacity: 1; }
+            90% { transform: translateY(0); opacity: 1; }
+            100% { transform: translateY(100%); opacity: 0; }
+        }
+
+        .lion-popup-enter {
+            animation: slideIn 0.5s forwards;
+        }
+        .lion-popup-exit {
+            animation: slideOut 0.5s forwards;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateY(100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        @keyframes slideOut {
+            from { transform: translateY(0); opacity: 1; }
+            to { transform: translateY(100%); opacity: 0; }
+        }
     </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body class="min-h-screen flex items-center justify-center p-4 overflow-hidden">
 
     <!-- Leaf Decorations -->
     <div class="leaf top-0 left-0 transform rotate-45"></div>
@@ -78,7 +102,7 @@
     <div class="leaf bottom-0 left-0 transform rotate-135"></div>
     <div class="leaf bottom-0 right-0 transform -rotate-135"></div>
 
-    <div id="app" class="w-full max-w-md">
+    <div id="app" class="w-full max-w-md relative z-10">
         <!-- Loading State -->
         <div id="loading" class="text-center">
             <i class="fas fa-spinner fa-spin text-4xl text-green-400 mb-4"></i>
@@ -177,10 +201,29 @@
             <div class="card-jungle w-full max-w-sm p-8 text-center rounded-2xl border-4 border-yellow-500 transform scale-100 transition-transform">
                 <div id="result-icon" class="text-6xl mb-4">🏆</div>
                 <h2 id="result-title" class="text-4xl jungle-font text-white mb-2">GEWONNEN!</h2>
+                
+                <!-- Added reason text -->
+                <p id="result-reason" class="text-white text-md font-bold mb-4 bg-green-900/50 p-2 rounded">...</p>
+                
                 <p id="result-message" class="text-green-200 mb-6 text-lg">Het dier was: <span id="reveal-animal" class="font-bold text-yellow-400">...</span></p>
                 <button onclick="window.location.reload()" class="btn-jungle w-full py-3 rounded-lg text-white font-bold">
                     <i class="fas fa-redo mr-2"></i> OPNIEUW SPELEN
                 </button>
+            </div>
+        </div>
+
+        <!-- Lion Fact Popup -->
+        <div id="lion-popup" class="hidden fixed bottom-0 right-0 m-4 z-50 pointer-events-none max-w-[280px]">
+            <div class="relative">
+                <!-- Speech Bubble -->
+                <div class="bg-yellow-100 border-4 border-yellow-600 p-4 rounded-xl rounded-br-none text-yellow-900 text-sm font-bold shadow-xl mb-2 relative">
+                    <div class="absolute -bottom-2 right-4 w-4 h-4 bg-yellow-100 border-b-4 border-r-4 border-yellow-600 transform rotate-45"></div>
+                    <span id="lion-fact-text">Wist je dat...</span>
+                </div>
+                <!-- Lion Icon -->
+                <div class="flex justify-end">
+                    <div class="text-6xl filter drop-shadow-lg transform -scale-x-100">🦁</div>
+                </div>
             </div>
         </div>
 
@@ -216,6 +259,7 @@
         let currentLobbyId = null;
         let unsubscribeLobby = null;
         let myRole = ''; // 'host' (Bedenker) or 'joiner' (Onderzoeker)
+        let factInterval = null;
 
         // DOM Elements
         const screens = {
@@ -251,6 +295,7 @@
             if (user) {
                 currentUser = user;
                 showScreen('home');
+                startLionFacts(); // Start facts globally when logged in (or move to playing state if preferred)
             } else {
                 showScreen('loading');
             }
@@ -371,17 +416,15 @@
         }
 
         function handleGameState(data) {
-            // Update Lobby Code Display (safety measure)
+            // Update Lobby Code Display
             if (currentLobbyId) {
                 document.getElementById('lobby-display-code').textContent = currentLobbyId;
             }
 
-            // 1. Waiting Room or Setup Phase (Lobby Visuals)
+            // 1. Waiting Room or Setup Phase
             if (data.status === 'waiting' || data.status === 'setup') {
                 if (data.status === 'waiting') showScreen('lobby');
-                // Note: Setup handling logic happens below, but we always update lobby visuals just in case
                 
-                // DYNAMIC LOBBY LIST
                 const playerList = document.getElementById('lobby-players');
                 let hostText = myRole === 'host' ? "Bedenker (Jij)" : "Bedenker";
                 let joinerText = myRole === 'joiner' ? "Onderzoeker (Jij)" : "Onderzoeker";
@@ -424,7 +467,6 @@
                 if (myRole === 'host') {
                     showScreen('setup');
                 } else {
-                    // Joiner stays on lobby screen but text updates
                     showScreen('lobby');
                     document.querySelector('#screen-lobby h2').textContent = "Bedenker kiest dier...";
                 }
@@ -439,21 +481,39 @@
             // 4. Finished
             else if (data.status === 'finished') {
                 showScreen('result');
-                
-                // CORRECT WINNER CHECK logic
-                // data.winner can be 'onderzoeker' or 'bedenker'
-                // myRole can be 'host' or 'joiner'
-                // Host = Bedenker, Joiner = Onderzoeker
-                
+                clearInterval(factInterval); // Stop facts when game over
+
+                // WINNER LOGIC
                 let iWon = false;
-                if (myRole === 'host' && data.winner === 'bedenker') iWon = true;
-                if (myRole === 'joiner' && data.winner === 'onderzoeker') iWon = true;
+                let reasonText = "";
+
+                if (myRole === 'host') {
+                    // I am Bedenker
+                    if (data.winner === 'bedenker') {
+                        iWon = true;
+                        reasonText = "De Onderzoeker heeft al zijn levens verloren! ☠️";
+                    } else {
+                        iWon = false;
+                        reasonText = "De Onderzoeker heeft jouw dier geraden! 🧠";
+                    }
+                } else {
+                    // I am Joiner/Onderzoeker
+                    if (data.winner === 'onderzoeker') {
+                        iWon = true;
+                        reasonText = "Je hebt het dier goed geraden! 🎉";
+                    } else {
+                        iWon = false;
+                        reasonText = "Je hebt 3 keer verkeerd gegokt... 🥀";
+                    }
+                }
 
                 const title = document.getElementById('result-title');
                 const icon = document.getElementById('result-icon');
+                const reasonEl = document.getElementById('result-reason');
                 const animalReveal = document.getElementById('reveal-animal');
 
                 animalReveal.textContent = data.animal;
+                reasonEl.textContent = reasonText;
 
                 if (iWon) {
                     title.textContent = "GEWONNEN!";
@@ -524,13 +584,19 @@
                     const aDiv = document.createElement('div');
                     aDiv.className = "flex justify-start mb-4";
                     let colorClass = "bg-green-800";
+                    let displayAnswer = q.answer.toUpperCase();
+                    
                     if (q.answer === 'nee') colorClass = "bg-red-900/80";
-                    if (q.answer === 'misschien') colorClass = "bg-yellow-800/80";
+                    // Change visual for Weet ik niet
+                    if (q.answer === 'weet ik niet') {
+                        colorClass = "bg-yellow-800/80";
+                        displayAnswer = "WEET IK NIET"; // Double check display
+                    }
 
                     aDiv.innerHTML = `
                         <div class="chat-bubble ${colorClass} text-white p-3 max-w-[85%] rounded-tl-none">
                             <p class="text-sm font-bold text-green-300 mb-1"><i class="fas fa-lightbulb"></i> Bedenker</p>
-                            ${q.answer.toUpperCase()}
+                            ${displayAnswer}
                         </div>
                     `;
                     log.appendChild(aDiv);
@@ -562,7 +628,8 @@
                         <div class="grid grid-cols-3 gap-2">
                             <button onclick="answerQuestion(${data.questions.length - 1}, 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
                             <button onclick="answerQuestion(${data.questions.length - 1}, 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
-                            <button onclick="answerQuestion(${data.questions.length - 1}, 'misschien')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs">MISSCHIEN</button>
+                            <!-- Changed button text and value -->
+                            <button onclick="answerQuestion(${data.questions.length - 1}, 'weet ik niet')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs leading-tight">WEET IK<br>NIET</button>
                         </div>
                     `;
                 } else {
@@ -612,7 +679,6 @@
 
             const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
             
-            // Get current questions first to append
             const doc = await lobbyRef.get();
             const currentQuestions = doc.data().questions || [];
 
@@ -645,30 +711,24 @@
             const doc = await lobbyRef.get();
             const data = doc.data();
 
-            // Check correctness (case insensitive)
             if (guess.toLowerCase() === data.animal.toLowerCase()) {
-                // Correct!
                 await lobbyRef.update({
                     status: 'finished',
                     winner: 'onderzoeker'
                 });
             } else {
-                // Wrong
                 const newWrongCount = (data.wrongGuesses || 0) + 1;
                 if (newWrongCount >= 3) {
-                    // Game Over, Host wins
                     await lobbyRef.update({
                         wrongGuesses: newWrongCount,
                         status: 'finished',
                         winner: 'bedenker'
                     });
                 } else {
-                    // Just a wrong guess, add a system message to chat log basically? 
-                    // Or just update count. Let's add a "fake" question that is the guess for history.
                     const questions = data.questions || [];
                     questions.push({
                         text: `Is het een ${guess}?`,
-                        answer: 'nee', // Auto answer no
+                        answer: 'nee', 
                         timestamp: Date.now()
                     });
 
@@ -678,6 +738,69 @@
                     });
                 }
             }
+        }
+
+        // --- 9. LION FACTS ---
+
+        const animalFacts = [
+            "Leeuwen slapen tot 20 uur per dag!", "Struisvogels rennen sneller dan paarden.", "Varkens kunnen fysiek niet naar de lucht kijken.",
+            "Een slak kan 3 jaar slapen.", "Olifanten zijn de enige zoogdieren die niet kunnen springen.", "Vleermuizen zijn de enige vliegende zoogdieren.",
+            "Een blauwe vinvis weegt evenveel als 30 olifanten.", "Krokodillen kunnen hun tong niet uitsteken.", "Mieren slapen nooit.",
+            "IJsberen hebben een zwarte huid onder hun witte vacht.", "Dolfijnen slapen met één oog open.", "Kameleons hebben ogen die apart kunnen bewegen.",
+            "Kolibries kunnen achteruit vliegen.", "Flamingo's zijn roze door het eten van garnalen.", "Octopussen hebben drie harten.",
+            "Zeepaardjes zijn monogaam en blijven levenslang samen.", "Vlinders proeven met hun voeten.", "Luiaards poepen maar één keer per week.",
+            "Kangoeroes kunnen niet achteruit springen.", "Tijgers hebben niet alleen gestreepte vacht, maar ook een gestreepte huid.",
+            "Koeien hebben beste vriendinnen.", "Een kakkerlak kan weken leven zonder kop.", "Goudvissen hebben een geheugen van 3 maanden, niet 3 seconden!",
+            "Eekhoorns planten onbewust duizenden bomen.", "Zeesterren hebben geen hersenen.", "Kwallen bestaan voor 95% uit water.",
+            "Een vlo kan 200 keer zijn eigen lengte springen.", "Bijen dansen om de weg te wijzen.", "Gorilla's neuriën als ze eten.",
+            "Katten kunnen meer dan 100 verschillende geluiden maken.", "Honden hebben een tijdsbesef.", "Pinguïns hebben knieën, ze zitten in hun lichaam.",
+            "Otters houden elkaars hand vast tijdens het slapen.", "Uilen kunnen hun ogen niet bewegen.", "Nijlpaarden produceren hun eigen zonnebrandcrème.",
+            "Panda's besteden 14 uur per dag aan eten.", "Zebra's hebben unieke streep-patronen, net als vingerafdrukken.", "Giraffen hebben net zoveel nekwervels als mensen (7).",
+            "Mannelijke pinguïns geven kiezels als huwelijksaanzoek.", "Katten slapen 70% van hun leven.", "Ratten lachen als ze gekieteld worden.",
+            "Schapen kunnen gezichten onthouden.", "Geiten hebben rechthoekige pupillen.", "Dolfijnen geven elkaar namen.",
+            "Een groep flamingo's heet een 'flamboyance'.", "Kikkers drinken via hun huid.", "Vogels plassen niet.",
+            "Konijnen eten hun eigen keutels (voor vitamines).", "Haaien bestaan al langer dan bomen.", "Een struisvogeloog is groter dan zijn hersenen.",
+            "Spinnen zijn geen insecten.", "Vliegen leven gemiddeld maar 28 dagen.", "Een regenworm heeft 5 harten.",
+            "Mollen zijn niet blind, maar zien heel slecht.", "Egels zijn immuun voor slangengif.", "Vossen gebruiken het magnetisch veld van de aarde.",
+            "Zwanen blijven hun hele leven bij elkaar.", "Papegaaien kunnen meer dan 200 woorden leren.", "Hamsters rennen tot 10 km per nacht in hun wiel.",
+            "Cavia's kunnen niet zweten.", "Lamas spugen als ze boos zijn.", "Wasberen wassen hun eten (soms).",
+            "Wolven huilen om de groep bij elkaar te houden.", "Jachtluipaarden kunnen niet brullen, alleen miauwen.", "Schildpadden kunnen ademen via hun billen.",
+            "Een blauwe vinvis tong weegt evenveel als een olifant.", "Kolibries eten elke 15 minuten.", "Mieren kunnen 50x hun eigen gewicht tillen.",
+            "Bidsprinkhanen hebben één oor op hun buik.", "Libellen zijn de snelste insecten.", "Kreeften plassen uit hun gezicht.",
+            "Luiaards zijn goede zwemmers.", "Neushoornhoorns zijn gemaakt van keratine (net als haren).", "IJsberen zijn linkshandig (of links-potig)."
+        ];
+
+        function startLionFacts() {
+            if (factInterval) clearInterval(factInterval);
+            
+            // Start interval: every 30 seconds
+            factInterval = setInterval(() => {
+                showLionPopup();
+            }, 30000); // 30000 ms = 30 sec
+        }
+
+        function showLionPopup() {
+            const popup = document.getElementById('lion-popup');
+            const textEl = document.getElementById('lion-fact-text');
+            
+            // Random fact
+            const randomFact = animalFacts[Math.floor(Math.random() * animalFacts.length)];
+            textEl.textContent = randomFact;
+            
+            // Show
+            popup.classList.remove('hidden');
+            popup.classList.add('lion-popup-enter');
+            popup.classList.remove('lion-popup-exit');
+
+            // Hide after 10 seconds
+            setTimeout(() => {
+                popup.classList.remove('lion-popup-enter');
+                popup.classList.add('lion-popup-exit');
+                // Actually hide styling after animation
+                setTimeout(() => {
+                    popup.classList.add('hidden');
+                }, 500);
+            }, 10000);
         }
 
     </script>
