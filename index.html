@@ -2,44 +2,122 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <title>Hoofdpagina - Keuze Menu</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>De Gouden Kaas Taverne</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
     <style>
+        /* Basis Instellingen */
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Crimson Text', serif;
+            margin: 0;
+            padding: 0;
+            overflow: hidden; /* Voorkomt scrollbalken als de background past */
+            height: 100vh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        h1, h2, .tavern-font {
+            font-family: 'Cinzel', serif;
+        }
+
+        /* De Achtergrondlaag (tavern.html) */
+        .background-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: none;
+            z-index: 0; /* Helemaal achteraan */
+        }
+
+        /* Perkament Stijl voor het menu (de 'gele doos' uit je schets) */
+        .parchment-box {
+            background-color: #f4e4bc;
+            background-image: url("https://www.transparenttextures.com/patterns/aged-paper.png");
+            box-shadow: 0 0 30px rgba(0,0,0,0.8), inset 0 0 60px rgba(160, 82, 45, 0.2);
+            border-radius: 8px;
+            border: 2px solid #d7c496;
+            position: relative;
+            z-index: 10; /* Bovenop de iframe */
+            width: 90%;
+            max-width: 400px;
+            padding: 2rem;
             text-align: center;
-            padding-top: 50px;
         }
-        .container {
-            width: 80%;
-            margin: 0 auto;
-            border: 1px solid #ccc;
-            padding: 20px;
-            border-radius: 10px;
+
+        /* Titel Stijl (Boven het menu) */
+        .main-title {
+            font-size: 4rem;
+            color: #f4e4bc; /* Lichte kleur voor contrast op donkere tavern background */
+            text-shadow: 4px 4px 0px #3e2723, 0 0 20px rgba(0,0,0,0.8);
+            margin-bottom: 2rem;
+            z-index: 10;
+            position: relative;
+            font-weight: 700;
+            letter-spacing: 2px;
         }
-        a {
-            display: inline-block;
-            margin: 10px;
-            padding: 10px 20px;
+
+        /* Knoppen */
+        .tavern-btn {
+            background: #5d4037;
+            color: #f4e4bc;
+            border: 2px solid #3e2723;
+            transition: all 0.2s ease;
+            cursor: pointer;
             text-decoration: none;
-            color: white;
-            background-color: #007bff;
-            border-radius: 5px;
-            transition: background-color 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
-        a:hover {
-            background-color: #0056b3;
+
+        .tavern-btn:hover {
+            background: #795548;
+            transform: scale(1.02);
+            color: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+
+        /* Responsive tekst voor mobiel */
+        @media (max-width: 600px) {
+            .main-title {
+                font-size: 2.5rem;
+            }
         }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>Welkom op de Hoofdpagina</h1>
-        <p>Kies een van de volgende opties:</p>
+    <!-- 1. De Achtergrond (Jouw lokale tavern.html) -->
+    <iframe src="tavern.html" class="background-layer" title="Tavern Background"></iframe>
 
-        <a href="kaas.html">🧀 Naar de Kaas Pagina</a>
+    <!-- 2. De Titel (Zoals op de schets 'titel') -->
+    <h1 class="main-title">De Oude Herberg</h1>
 
-        <a href="poep.html">💩 Naar de Poep Pagina</a>
+    <!-- 3. Het Game Menu (De gele doos op de schets) -->
+    <div class="parchment-box">
+        <h2 class="text-3xl tavern-font text-amber-900 mb-6 border-b-2 border-amber-900/20 pb-2">
+            Game Menu
+        </h2>
+
+        <div class="space-y-4">
+            <!-- De Link naar de game -->
+            <a href="kaas.html" class="tavern-btn w-full py-4 px-4 rounded text-xl font-bold">
+                <span>🧀</span>
+                Ik zie ik zie...
+            </a>
+
+            <!-- Placeholder voor toekomstige games (visueel opvulling) -->
+            <div class="w-full py-3 px-4 rounded text-lg border-2 border-dashed border-amber-900/20 text-amber-900/40 cursor-not-allowed">
+                ??? (Gesloten)
+            </div>
+        </div>
     </div>
 
 </body>
