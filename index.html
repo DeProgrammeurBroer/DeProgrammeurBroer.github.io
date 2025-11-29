@@ -476,8 +476,8 @@
                     </button>
                     
                     <!-- DEBUG BUTTON -->
-                    <button id="btn-add-bot" class="w-full py-2 bg-gray-200 text-gray-600 rounded text-sm font-bold hover:bg-gray-300 border border-gray-300 border-dashed">
-                        <i class="fas fa-robot mr-1"></i> Voeg Test-Bot toe (Debug)
+                    <button id="btn-add-bot" class="w-full py-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 border-2 border-blue-300 border-dashed transition-colors flex items-center justify-center">
+                        <i class="fas fa-robot mr-2"></i> Voeg Test-Bot toe (Debug)
                     </button>
                 </div>
             </div>
@@ -633,7 +633,7 @@
         };
         
         // Gemini API Key (Runtime Provided)
-        const apiKey = ""; 
+        const apiKey = "AIzaSyAOa403An-GxO66KLhPRG2fHQtPJToDdho"; 
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -780,12 +780,9 @@
         }
 
         async function getAIComment(guess, secret) {
-            // Fallback if API fails
-            const defaultSnark = getSnarkyComment(guess, secret);
+            // REMOVED: Old snarky comment logic is completely gone.
             
-            // Only use AI if key exists (simulated check since env injects it usually)
-            if (!apiKey) return defaultSnark;
-
+            // Try Gemini AI immediately.
             const prompt = `
                 Het spel is 'Ik zie ik zie wat jij niet ziet'. 
                 Het geheime woord is '${secret}'.
@@ -795,7 +792,8 @@
             `;
             
             const aiResponse = await callGemini(prompt);
-            return aiResponse ? aiResponse.trim() : defaultSnark;
+            // Fallback only if API fails (e.g. no key)
+            return aiResponse ? aiResponse.trim() : "Fout geraden! 🤖";
         }
 
         // --- Helper Functions ---
@@ -1372,48 +1370,46 @@
                 const waitingMsg = document.getElementById('waiting-msg');
                 const selSeeker = document.getElementById('sel-seeker');
                 
-                if (players.length === 2) {
-                    if (amHost) {
-                        hostControls.classList.remove('hidden');
-                        waitingMsg.classList.add('hidden');
+                // HOST CONTROL LOGIC UPDATE
+                if (amHost) {
+                    hostControls.classList.remove('hidden'); 
+
+                    if (players.length < 2) {
+                        // LESS THAN 2 PLAYERS
+                        // Show Bot Button
+                        document.getElementById('btn-add-bot').classList.remove('hidden');
+                        document.getElementById('btn-add-bot').style.display = 'flex'; // Use flex for icon alignment
+                        
+                        // Hide Start Game
+                        document.getElementById('btn-start-game').classList.add('hidden');
+                        document.getElementById('sel-gamemode').parentElement.classList.add('hidden');
+                        document.getElementById('sel-seeker').parentElement.classList.add('hidden');
+                         
+                        waitingMsg.classList.remove('hidden');
+                        waitingMsg.innerText = "Wachten op speler 2...";
+                    } else {
+                        // ROOM FULL
+                        document.getElementById('btn-add-bot').classList.add('hidden');
+                        document.getElementById('btn-start-game').classList.remove('hidden');
+                        document.getElementById('sel-gamemode').parentElement.classList.remove('hidden');
+                        document.getElementById('sel-seeker').parentElement.classList.remove('hidden');
+                        
+                        // Update Seeker Options
                         const currentVal = selSeeker.value;
                         selSeeker.innerHTML = players.map(p => `<option value="${p.uid}">${p.name}</option>`).join('');
                         if(currentVal && players.some(p => p.uid === currentVal)) selSeeker.value = currentVal;
-                    } else {
-                        hostControls.classList.add('hidden');
-                        waitingMsg.classList.remove('hidden');
-                        waitingMsg.innerText = "De host kiest de instellingen...";
+                        
+                        waitingMsg.classList.add('hidden');
                     }
                 } else {
-                    // LESS THAN 2 PLAYERS
-                    if (amHost) {
-                         // Show Add Bot Button
-                         hostControls.classList.add('hidden'); 
-                         document.getElementById('host-controls').classList.remove('hidden'); 
-                         waitingMsg.classList.remove('hidden');
+                    // NOT HOST
+                    hostControls.classList.add('hidden');
+                    waitingMsg.classList.remove('hidden');
+                    if (players.length < 2) {
                          waitingMsg.innerText = "Wachten op speler 2...";
-                         
-                         const botBtn = document.getElementById('btn-add-bot');
-                         if(botBtn) {
-                             botBtn.style.display = 'block'; 
-                             hostControls.classList.remove('hidden');
-                             document.getElementById('btn-start-game').classList.add('hidden');
-                             document.getElementById('sel-gamemode').parentElement.classList.add('hidden'); // hide settings
-                             document.getElementById('sel-seeker').parentElement.classList.add('hidden');
-                         }
                     } else {
-                        hostControls.classList.add('hidden');
-                        waitingMsg.classList.remove('hidden');
-                        waitingMsg.innerText = "Wachten op speler 2...";
+                        waitingMsg.innerText = "De host kiest de instellingen...";
                     }
-                }
-
-                // If players = 2, show start game, hide add bot
-                if (players.length === 2 && amHost) {
-                     document.getElementById('btn-start-game').classList.remove('hidden');
-                     document.getElementById('btn-add-bot').classList.add('hidden');
-                     document.getElementById('sel-gamemode').parentElement.classList.remove('hidden');
-                     document.getElementById('sel-seeker').parentElement.classList.remove('hidden');
                 }
             }
             if (data.status === 'setup') {
@@ -1540,27 +1536,7 @@
         }
 
         // --- DYNAMIC COMMENTARY GENERATOR ---
-        function getSnarkyComment(guess, secret) {
-            guess = guess.toLowerCase(); secret = secret.toLowerCase();
-            // Easter Eggs
-            if (guess.includes("brie") || guess.includes("kaas")) return "Lekker, maar helaas!";
-            if (guess === "manon") return "Dat is de koningin, niet het object!";
-            if (guess === "ik") return "Nee, jij niet.";
-
-            // Logic
-            if (guess[0] === secret[0]) return "Goede beginletter! 👀";
-            if (guess.length > secret.length + 4) return "Veel te lang joh! ✂️";
-            if (guess.length < secret.length - 4) return "Veel te kort! 📏";
-
-            // Random Snark
-            const snarks = [
-                "Is dat alles?", "Bril nodig? 👓", "Hahaha... nee.",
-                "Manon lacht je uit.", "Pannenkoek 🥞", "Probeer harder!",
-                "Echt niet.", "Warmer... nee grapje.", "Zucht...", 
-                "Verkeerde gok, vriend.", "Heb je nog opties?"
-            ];
-            return snarks[Math.floor(Math.random() * snarks.length)];
-        }
+        // OLD FUNCTION DELETED: getSnarkyComment()
 
         function showDynamicComment(text) {
             const el = document.getElementById('dynamic-comment');
@@ -1585,8 +1561,7 @@
             if (guess.toLowerCase() === gameData.secretWord.toLowerCase()) {
                 await updateDoc(roomRef, { status: 'finished', 'gameData.winner': currentUser.uid, 'gameData.winnerName': currentUser.displayName || "De Rader" });
             } else {
-                // Show AI Dynamic Comment (Local only first, then async update if desired, or await)
-                // Let's await for better effect since it replaces local logic
+                // Show AI Dynamic Comment
                 showDynamicComment("Even denken..."); // Loading state
                 const comment = await getAIComment(guess, gameData.secretWord);
                 showDynamicComment(comment);
