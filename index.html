@@ -284,6 +284,11 @@
             100% { transform: translate(100%, 100%) rotate(45deg); }
         }
 
+        /* Leaderboard Styles */
+        .leaderboard-row:nth-child(1) { color: #d97706; font-weight: 800; font-size: 1.1em; } /* Gold */
+        .leaderboard-row:nth-child(2) { color: #9ca3af; font-weight: 700; } /* Silver */
+        .leaderboard-row:nth-child(3) { color: #b45309; font-weight: 700; } /* Bronze */
+
     </style>
 </head>
 <body>
@@ -294,28 +299,29 @@
     </div>
     
     <!-- MANONSCARE OVERLAY (Hidden by default) -->
-    <div id="screen-scare" class="fixed inset-0 z-[200] hidden bg-black flex items-center justify-center">
-        <img src="Manonscare.jpeg" alt="Scare" class="max-w-full max-h-full object-contain pointer-events-none">
+    <!-- Force Z-index 9999 and full screen fixed -->
+    <div id="screen-scare" class="fixed inset-0 z-[9999] hidden bg-black flex items-center justify-center w-full h-full">
+        <img src="Manonscare.jpeg" alt="Scare" class="max-w-full max-h-full object-contain pointer-events-none w-full h-full">
     </div>
 
     <!-- CHEAT MENU MODAL -->
     <div id="cheat-menu" class="fixed inset-0 cheat-overlay z-[100] hidden flex flex-col items-center justify-center p-4">
         <div class="bg-black border-2 border-green-500 p-6 rounded shadow-[0_0_20px_#0f0] w-full max-w-lg overflow-y-auto max-h-[90vh]">
             <h2 class="text-4xl text-center mb-4 border-b border-green-500 pb-2">HACKER MENU_</h2>
-            <div class="grid grid-cols-2 gap-4 mb-6">
-                <div class="col-span-2">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <div class="col-span-1 sm:col-span-2">
                     <p class="mb-1 text-sm opacity-70">>> SELF HELP</p>
                     <button id="btn-cheat-reveal" class="cheat-btn w-full">REVEAL SOLUTION</button>
                     <button id="btn-cheat-hint" class="cheat-btn w-full">FORCE 1st LETTER</button>
                 </div>
-                <div class="col-span-2 mt-4">
-                    <p class="mb-1 text-sm opacity-70">>> TROLL SEEKER (10 SECONDS)</p>
+                <div class="col-span-1 sm:col-span-2 mt-4">
+                    <p class="mb-1 text-sm opacity-70">>> TROLL EVERYONE (10 SECONDS)</p>
                 </div>
-                <button id="btn-cheat-scare" class="cheat-btn col-span-2 border-red-500 text-red-500 hover:bg-red-900 font-bold">MANONSCARE 👻</button>
+                <button id="btn-cheat-scare" class="cheat-btn col-span-1 sm:col-span-2 border-red-500 text-red-500 hover:bg-red-900 font-bold">MANONSCARE 👻</button>
                 <button id="btn-cheat-disco" class="cheat-btn">DISCO PARTY</button>
                 <button id="btn-cheat-australia" class="cheat-btn">AUSTRALIA MODE</button>
                 <button id="btn-cheat-tiny" class="cheat-btn">ANT MODE</button>
-                <div class="col-span-2 flex gap-2 mt-2">
+                <div class="col-span-1 sm:col-span-2 flex gap-2 mt-2">
                     <input id="inp-cheat-spam" type="text" class="cheat-input flex-1" placeholder="SPAM WORD...">
                     <button id="btn-cheat-spam" class="cheat-btn">START SPAM</button>
                 </div>
@@ -504,13 +510,19 @@
         <div id="center-cheese" class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 main-cheese cursor-pointer">🧀</div>
         
         <!-- Top HUD -->
-        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none">
-            <div class="bg-white/90 p-2 rounded-lg shadow border border-red-200">
+        <div class="absolute top-0 left-0 right-0 p-4 flex justify-between items-start pointer-events-none z-10">
+            <div class="bg-white/90 p-2 rounded-lg shadow border border-red-200 min-w-[80px]">
                 <p class="text-xs text-gray-500 font-bold uppercase">Levens</p>
                 <div id="cheese-lives-display" class="flex gap-1 text-xl">❤️❤️❤️</div>
             </div>
-            <div class="bg-white/90 p-2 rounded-lg shadow border border-yellow-200 text-right">
-                <p class="text-xs text-gray-500 font-bold uppercase">Punten</p>
+            
+            <!-- TIMER DISPLAY -->
+            <div class="bg-yellow-400 text-yellow-900 px-4 py-2 rounded-lg shadow-lg border-2 border-yellow-500 font-mono text-xl font-bold">
+                <i class="far fa-clock mr-2"></i><span id="cheese-timer-display">00:00.00</span>
+            </div>
+
+            <div class="bg-white/90 p-2 rounded-lg shadow border border-yellow-200 text-right min-w-[80px]">
+                <p class="text-xs text-gray-500 font-bold uppercase">Winkel Punten</p>
                 <div id="cheese-score-display" class="text-2xl font-bold text-yellow-600">0</div>
             </div>
         </div>
@@ -527,12 +539,32 @@
         </div>
         
         <!-- Game Over Overlay -->
-        <div id="cheese-game-over" class="absolute inset-0 bg-black/80 z-[60] flex flex-col items-center justify-center hidden text-white text-center">
+        <div id="cheese-game-over" class="absolute inset-0 bg-black/80 z-[60] flex flex-col items-center justify-center hidden text-white text-center p-4">
             <div class="text-6xl mb-4">🪰</div>
             <h2 class="text-3xl font-bold text-red-500 mb-2">KAAS OPGEGETEN!</h2>
-            <p class="mb-6">Score: <span id="final-cheese-score" class="text-yellow-400 font-bold">0</span></p>
-            <button id="btn-retry-cheese" class="bg-yellow-500 text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform">Nog een keer</button>
-            <button id="btn-quit-cheese" class="mt-4 text-gray-400 text-sm underline">Terug naar lobby</button>
+            <p class="mb-2">Overleefd: <span id="final-cheese-time" class="text-yellow-400 font-bold font-mono text-2xl">00:00</span></p>
+
+            <!-- HIGHSCORE SECTION -->
+            <div id="highscore-section" class="w-full max-w-sm bg-gray-800 p-4 rounded-lg mt-4 hidden">
+                <h3 class="text-yellow-400 font-bold text-lg mb-2">🏆 NIEUWE HIGHSCORE! 🏆</h3>
+                <div class="flex gap-2">
+                    <input id="inp-highscore-name" type="text" class="game-input flex-1 p-2 rounded text-black font-bold" placeholder="Jouw naam..." maxlength="10">
+                    <button id="btn-submit-highscore" class="bg-green-500 text-white font-bold px-4 rounded hover:bg-green-600">Opslaan</button>
+                </div>
+            </div>
+
+            <!-- LEADERBOARD LIST -->
+            <div class="w-full max-w-sm mt-6 text-left">
+                <h3 class="text-gray-400 text-xs font-bold uppercase mb-2 text-center">- Globale Top 10 -</h3>
+                <div id="leaderboard-list" class="bg-gray-900 rounded-lg p-2 max-h-48 overflow-y-auto border border-gray-700 text-sm">
+                    <div class="text-center text-gray-500 italic">Laden...</div>
+                </div>
+            </div>
+
+            <div class="flex gap-4 mt-6">
+                <button id="btn-retry-cheese" class="bg-yellow-500 text-black px-8 py-3 rounded-full font-bold hover:scale-105 transition-transform">Nog een keer</button>
+                <button id="btn-quit-cheese" class="text-gray-400 text-sm underline">Terug</button>
+            </div>
         </div>
     </div>
 
@@ -643,7 +675,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, doc, setDoc, getDoc, onSnapshot, updateDoc, arrayUnion, addDoc, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // CONFIG: Using user provided custom config
         const firebaseConfig = {
@@ -657,7 +689,7 @@
         };
         
         // Gemini API Key (Runtime Provided)
-        const apiKey = "AIzaSyAOa403An-GxO66KLhPRG2fHQtPJToDdho"; 
+        const apiKey = ""; 
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
@@ -706,6 +738,8 @@
         let cheeseFlies = [];
         let cheeseGameActive = false;
         let cheeseCatActive = false; // Boost state
+        let cheeseStartTime = 0; // NEW: Timer tracking
+        let currentSurvivalTime = 0; // NEW: Holds final time
 
         // Audio Context Setup
         const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -728,10 +762,20 @@
                 bgMusic.play().catch(e => console.log("Autoplay blocked/File not found", e));
             }
             
-            // Pre-load Scare Audio
+            // Pre-load Scare Audio with Mobile Unlock Hack
             if (!scareAudio) {
                 scareAudio = new Audio('scream.mp3');
-                scareAudio.volume = 1.0;
+                
+                // UNLOCK HACK FOR MOBILE:
+                // Play muted immediately to unlock the audio channel on user gesture
+                scareAudio.volume = 0;
+                scareAudio.play().then(() => {
+                    scareAudio.pause();
+                    scareAudio.currentTime = 0;
+                    scareAudio.volume = 1.0; // Reset volume for actual use
+                }).catch(e => {
+                    // Allowed to fail if no user interaction yet, will try again on next init
+                });
             }
         }
         
@@ -822,6 +866,12 @@
                         contents: [{ parts: [{ text: promptText }] }]
                     })
                 });
+                
+                if (!response.ok) {
+                    console.error("Gemini API Error:", response.status, response.statusText);
+                    return null;
+                }
+
                 const data = await response.json();
                 return data.candidates?.[0]?.content?.parts?.[0]?.text || null;
             } catch (error) {
@@ -934,6 +984,11 @@
             void document.body.offsetWidth; // trigger reflow
             document.body.classList.add(hard ? 'shake-hard' : 'shake-soft');
             if(!hard) setTimeout(() => document.body.classList.remove('shake-soft'), 500);
+            
+            // Add native vibration for mobile
+            if (navigator.vibrate) {
+                navigator.vibrate(hard ? 500 : 200);
+            }
         }
 
         // --- AUTH INIT ---
@@ -1069,6 +1124,89 @@
              startCheeseGame();
         });
 
+        // HIGHSCORE LOGIC
+        async function checkAndHandleHighscore(finalTime) {
+            document.getElementById('leaderboard-list').innerHTML = '<div class="text-center text-gray-500 italic">Laden...</div>';
+            document.getElementById('highscore-section').classList.add('hidden');
+            
+            try {
+                // Fetch Highscores
+                const highscoreRef = collection(db, 'artifacts', appId, 'public', 'data', 'highscores');
+                const snapshot = await getDocs(highscoreRef); // Fetch all (small dataset assumption)
+                let scores = [];
+                snapshot.forEach(doc => scores.push(doc.data()));
+                
+                // Sort Descending (Time)
+                scores.sort((a, b) => b.time - a.time);
+                
+                // Check if qualified for Top 10
+                const isTop10 = scores.length < 10 || finalTime > scores[scores.length - 1].time;
+                
+                if (isTop10) {
+                    document.getElementById('highscore-section').classList.remove('hidden');
+                    // Focus input
+                    setTimeout(() => document.getElementById('inp-highscore-name').focus(), 100);
+                }
+                
+                renderLeaderboard(scores);
+            } catch (e) {
+                console.error("Leaderboard error", e);
+                document.getElementById('leaderboard-list').innerText = "Fout bij laden.";
+            }
+        }
+        
+        function renderLeaderboard(scores) {
+            // Take Top 10
+            const top10 = scores.slice(0, 10);
+            
+            document.getElementById('leaderboard-list').innerHTML = top10.map((s, i) => `
+                <div class="leaderboard-row flex justify-between items-center py-1 border-b border-gray-800 last:border-0">
+                    <div class="flex items-center gap-2">
+                        <span class="w-6 text-center opacity-50 font-mono">${i+1}.</span>
+                        <span class="font-bold text-white truncate max-w-[120px]">${s.name}</span>
+                    </div>
+                    <span class="font-mono text-yellow-500">${formatTime(s.time)}</span>
+                </div>
+            `).join('');
+            
+            if (top10.length === 0) {
+                 document.getElementById('leaderboard-list').innerHTML = '<div class="text-center text-gray-600 text-xs mt-2">Nog geen scores!</div>';
+            }
+        }
+        
+        document.getElementById('btn-submit-highscore').addEventListener('click', async () => {
+            const name = document.getElementById('inp-highscore-name').value.trim();
+            if (!name) return showToast("Vul je naam in!");
+            
+            const btn = document.getElementById('btn-submit-highscore');
+            btn.disabled = true; btn.innerText = "...";
+            
+            try {
+                // Save to Firestore
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'highscores'), {
+                    name: name,
+                    time: currentSurvivalTime,
+                    date: Date.now()
+                });
+                
+                // Refresh Leaderboard
+                document.getElementById('highscore-section').classList.add('hidden');
+                checkAndHandleHighscore(0); // Pass 0 so we just reload list, don't trigger input again
+                showToast("Opgeslagen!");
+            } catch (e) {
+                showToast("Fout bij opslaan");
+                console.error(e);
+            }
+            btn.disabled = false; btn.innerText = "Opslaan";
+        });
+
+        function formatTime(ms) {
+            const minutes = Math.floor(ms / 60000);
+            const seconds = Math.floor((ms % 60000) / 1000);
+            const centis = Math.floor((ms % 1000) / 10);
+            return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${centis.toString().padStart(2, '0')}`;
+        }
+
         function startCheeseGame() {
             initAudio();
             showScreen('cheeseMinigame');
@@ -1079,11 +1217,13 @@
             cheeseFlies = [];
             cheeseGameActive = true;
             cheeseCatActive = false;
+            cheeseStartTime = Date.now(); // Start Timer
             
             // Reset UI
             updateCheeseUI();
             document.getElementById('fly-container').innerHTML = '';
             document.getElementById('center-cheese').style.transform = 'translate(-50%, -50%) scale(1)';
+            document.getElementById('cheese-timer-display').innerText = "00:00.00";
             
             // Render Shop
             renderShop();
@@ -1152,7 +1292,7 @@
 
         function spawnFly() {
             if(!cheeseGameActive) return;
-            if(cheeseFlies.length >= 10) return; // Cap active flies to prevent lag
+            if(cheeseFlies.length >= 6) return; // Reduced max flies from 10 to 6
 
             // Spawn at edge
             const side = Math.floor(Math.random() * 4); // 0:top, 1:right, 2:bottom, 3:left
@@ -1183,14 +1323,19 @@
                 speed: 1 + (cheeseScore / 500) // Gets harder
             });
             
-            // Difficulty ramp up - much slower curve
+            // Difficulty ramp up - adjusted curve
             if(cheeseScore > 100) clearInterval(cheeseSpawnInterval);
-            cheeseSpawnInterval = setInterval(spawnFly, Math.max(800, 2000 - (cheeseScore * 0.5)));
+            cheeseSpawnInterval = setInterval(spawnFly, Math.max(1000, 2500 - (cheeseScore * 0.8)));
         }
 
         function updateCheeseGame() {
             if(!cheeseGameActive) return;
             
+            // Update Timer Display
+            const now = Date.now();
+            const elapsed = now - cheeseStartTime;
+            document.getElementById('cheese-timer-display').innerText = formatTime(elapsed);
+
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
             
@@ -1248,8 +1393,11 @@
             if(cheeseLives <= 0) {
                 cheeseGameActive = false;
                 sfx.lose();
-                document.getElementById('final-cheese-score').innerText = cheeseScore;
+                currentSurvivalTime = Date.now() - cheeseStartTime; // Capture Final Time
+                document.getElementById('final-cheese-time').innerText = formatTime(currentSurvivalTime);
                 document.getElementById('cheese-game-over').classList.remove('hidden');
+                
+                checkAndHandleHighscore(currentSurvivalTime);
             }
         }
 
@@ -1419,6 +1567,72 @@
                  showToast("AI kon even niet denken!");
              }
         });
+
+        // --- TROLL EFFECT HANDLER (Shared) ---
+        function handleTrollEffects(data) {
+            const effect = data.gameData.trollEffect; 
+            const trollData = data.gameData.trollData;
+            
+            // RESET TROLLS IF NONE
+            if (!effect) {
+                document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
+                if (spamInterval) { clearInterval(spamInterval); spamInterval = null; }
+                
+                // Hide ManonScare logic if it was cleared
+                document.getElementById('screen-scare').classList.add('hidden');
+                isScaring = false;
+                if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
+            } else {
+                // APPLY EFFECT
+                if (effect === 'disco') document.body.classList.add('troll-disco');
+                if (effect === 'australia') document.body.classList.add('troll-australia');
+                if (effect === 'tiny') document.body.classList.add('troll-tiny');
+                
+                // MANONSCARE LOGIC
+                if (effect === 'manonscare') {
+                    if (!isScaring) {
+                        isScaring = true;
+                        document.getElementById('screen-scare').classList.remove('hidden');
+                        if (scareAudio) {
+                            scareAudio.currentTime = 0;
+                            scareAudio.play().catch(e => console.log("Audio fail", e));
+                        }
+                        
+                        // Local visual cleanup after 5s (even if DB still has effect, we stop showing it)
+                        setTimeout(() => {
+                            document.getElementById('screen-scare').classList.add('hidden');
+                            if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
+                        }, 5000);
+                    }
+                }
+                
+                // Troll Audio & Shake (Skip for manonscare to avoid double audio)
+                if (effect !== 'manonscare' && !document.body.classList.contains('shake-hard')) {
+                     sfx.troll();
+                     shakeScreen(true);
+                }
+
+                if (effect === 'spam' && trollData && !spamInterval) {
+                    const container = document.getElementById('wrong-guesses-container'); // Might need check for guesser container?
+                    // Actually for Guesser, we can use their container or just overlay
+                    // Let's use body or active screen container
+                    const activeScreen = document.querySelector('.screen.active');
+                    
+                    spamInterval = setInterval(() => {
+                        // Spam works best in Seeker screen visually, but let's make it universal
+                        const el = document.createElement('div');
+                        el.classList.add('floating-word'); el.innerText = trollData;
+                        const pos = getSafePosition(false);
+                        el.style.top = pos.top; el.style.left = pos.left; el.style.transform = `rotate(${Math.random() * 40 - 20}deg)`;
+                        el.style.zIndex = 1000; // Force on top
+                        activeScreen.appendChild(el);
+                        
+                        sfx.spam(); // Beep on spam
+                    }, 200);
+                    setTimeout(() => { if (spamInterval) { clearInterval(spamInterval); spamInterval = null; } }, 10000);
+                }
+            }
+        }
 
         // --- Game State Handler ---
         function handleRoomUpdate(data) {
@@ -1637,6 +1851,9 @@
             const hintBtn = document.getElementById('btn-request-hint');
             const hintBox = document.getElementById('guesser-hint-box');
             
+            // Apply Trolls (Shared Logic)
+            handleTrollEffects(data);
+
             // SHOW GUESSES FOR GUESSER TOO (Safe Zone Logic)
             const guesses = data.gameData.guesses || [];
             if (guesses.length > renderedGuessesCount) {
@@ -1674,56 +1891,10 @@
                 }
                 renderedGuessesCount = guesses.length;
             }
-            const effect = data.gameData.trollEffect; const trollData = data.gameData.trollData;
             
-            // RESET TROLLS IF NONE
-            if (!effect) {
-                document.body.classList.remove('troll-disco', 'troll-australia', 'troll-tiny', 'shake-hard');
-                if (spamInterval) { clearInterval(spamInterval); spamInterval = null; }
-                
-                // Hide ManonScare logic if it was cleared
-                document.getElementById('screen-scare').classList.add('hidden');
-                isScaring = false;
-                if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
-            } else {
-                // APPLY EFFECT
-                if (effect === 'disco') document.body.classList.add('troll-disco');
-                if (effect === 'australia') document.body.classList.add('troll-australia');
-                if (effect === 'tiny') document.body.classList.add('troll-tiny');
-                
-                // MANONSCARE LOGIC
-                if (effect === 'manonscare') {
-                    if (!isScaring) {
-                        isScaring = true;
-                        document.getElementById('screen-scare').classList.remove('hidden');
-                        if (scareAudio) {
-                            scareAudio.currentTime = 0;
-                            scareAudio.play().catch(e => console.log("Audio fail", e));
-                        }
-                        
-                        // Local visual cleanup after 5s (even if DB still has effect, we stop showing it)
-                        setTimeout(() => {
-                            document.getElementById('screen-scare').classList.add('hidden');
-                            if(scareAudio) { scareAudio.pause(); scareAudio.currentTime = 0; }
-                        }, 5000);
-                    }
-                }
-                
-                // Troll Audio & Shake (Skip for manonscare to avoid double audio)
-                if (effect !== 'manonscare' && !document.body.classList.contains('shake-hard')) {
-                     sfx.troll();
-                     shakeScreen(true);
-                }
+            // Apply Trolls (Shared Logic)
+            handleTrollEffects(data);
 
-                if (effect === 'spam' && trollData && !spamInterval) {
-                    const container = document.getElementById('wrong-guesses-container');
-                    spamInterval = setInterval(() => {
-                        spawnFloatingWord(trollData, container, false);
-                        sfx.spam(); // Beep on spam
-                    }, 200);
-                    setTimeout(() => { if (spamInterval) { clearInterval(spamInterval); spamInterval = null; } }, 10000);
-                }
-            }
             const hintModal = document.getElementById('seeker-hint-modal');
             if (data.gameData.hintRequested && !data.gameData.hintGiven) hintModal.classList.remove('translate-y-full');
             else hintModal.classList.add('translate-y-full');
