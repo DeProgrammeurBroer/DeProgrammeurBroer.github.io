@@ -156,6 +156,9 @@
             </div>
 
             <p class="text-sm text-green-400 animate-pulse" id="lobby-status-text">Wachten op de 3e speler...</p>
+            
+            <!-- Nieuwe container voor de 2-speler start knop -->
+            <div id="start-2-player-container" class="mt-6"></div>
         </div>
 
         <!-- Role Selection (Host only) -->
@@ -429,7 +432,8 @@
                     
                     let newStatus = 'waiting';
                     if (playerCount === 2) {
-                        newStatus = 'roleselect'; // Max players reached, move to roleselect
+                        newStatus = 'roleselect'; // Max players reached (3), move to roleselect (only if host wants to wait)
+                        // Note: If host starts manually with 2, the status stays 'waiting' until the host clicks the button.
                     }
                     
                     await lobbyRef.update({
@@ -440,8 +444,8 @@
                     // Rejoining player
                     if (data.status === 'roleselect' || data.status === 'setup' || data.status === 'playing' || data.status === 'finished') {
                         // The user is rejoining an active/full lobby, just subscribe and let handleGameState fix the screen.
-                    } else if (playerCount === 3) {
-                         // Should instantly push to roleselect if the host hasn't done it yet
+                    } else if (playerCount === 3 && data.status === 'waiting') {
+                         // If 3 players are now present and still waiting, push to roleselect
                         await lobbyRef.update({ status: 'roleselect' });
                     }
                 }
@@ -541,10 +545,32 @@
             }
 
             // --- SCREEN FLOW LOGIC ---
+            const start2PContainer = document.getElementById('start-2-player-container');
+            start2PContainer.innerHTML = ''; // Maak de container leeg
 
             if (data.status === 'waiting') {
                 showScreen('lobby');
-                document.getElementById('lobby-status-text').textContent = `Wachten op de ${3 - playerCount}e speler... (3 spelers nodig)`;
+                
+                if (playerCount === 1) {
+                    document.getElementById('lobby-status-text').textContent = `Wachten op 2 extra spelers... (3 spelers nodig om rollen te kiezen)`;
+                } else if (playerCount === 2) {
+                    document.getElementById('lobby-status-text').textContent = `Wachten op de 3e speler. (Host kan nu starten met 2 spelers)`;
+                    
+                    if (myRole === 'host') {
+                        // Host kan starten met 2 spelers
+                        start2PContainer.innerHTML = `
+                            <button onclick="startTwoPlayerGame()" class="btn-jungle w-full py-3 rounded-lg text-white font-bold text-lg">
+                                <i class="fas fa-play mr-2"></i> START SPEL MET 2 (Jij bent Bedenker)
+                            </button>
+                        `;
+                    }
+                } else if (playerCount === 3) {
+                     // Als er nu 3 spelers zijn en de status is nog 'waiting' (door re-join), forceer naar roleselect
+                     if (myRole === 'host') {
+                         db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({ status: 'roleselect' });
+                     }
+                    document.getElementById('lobby-status-text').textContent = `Alle 3 spelers zijn aanwezig. Rollen worden nu gekozen.`;
+                }
             } else if (data.status === 'roleselect') {
                 if (myRole === 'host') {
                     renderRoleSelection(data.players);
@@ -600,8 +626,10 @@
             const bedenkerId = selectedBedenker.value;
             const onderzoekers = Object.keys(playersMap).filter(uid => uid !== bedenkerId);
             
-            if (onderzoekers.length !== 2) {
-                 console.error("Fout: Kon de onderzoekers niet correct bepalen.");
+            // Controle voor 3 spelers
+            if (Object.keys(playersMap).length !== 3 || onderzoekers.length !== 2) {
+                 console.error("Fout: Rollen kunnen alleen gekozen worden met precies 3 spelers.");
+                 alert("Fout: Rollen kunnen alleen gekozen worden met precies 3 spelers.");
                  return;
             }
 
@@ -610,6 +638,28 @@
                 onderzoekers: onderzoekers,
                 currentTurn: onderzoekers[0], // Start with the first onderzoeker
                 status: 'setup'
+            });
+        }
+
+        // NIEUW: Start de game direct met 2 spelers (Host is Bedenker)
+        async function startTwoPlayerGame() {
+            if (myRole !== 'host' || Object.keys(playersMap).length !== 2) return;
+
+            const bedenkerId = currentUser.uid;
+            const onderzoekers = Object.keys(playersMap).filter(uid => uid !== bedenkerId);
+            
+            if (onderzoekers.length !== 1) {
+                console.error("Fout: Kon geen enkele onderzoeker bepalen in 2P modus.");
+                return;
+            }
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
+
+            await lobbyRef.update({
+                bedenkerId: bedenkerId,
+                onderzoekers: onderzoekers, // Bevat nu 1 UID
+                currentTurn: onderzoekers[0], // Beurt is direct voor de enige onderzoeker
+                status: 'setup' // Ga direct naar setup
             });
         }
         
