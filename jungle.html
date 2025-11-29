@@ -124,21 +124,8 @@
                 </div>
             </div>
 
-            <div class="space-y-3 mb-8">
-                <div class="flex items-center justify-between bg-green-800 p-3 rounded">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center"><i class="fas fa-crown text-white"></i></div>
-                        <span class="font-bold">Bedenker (Jij)</span>
-                    </div>
-                    <span class="text-green-400"><i class="fas fa-check"></i></span>
-                </div>
-                <div class="flex items-center justify-between bg-green-800 p-3 rounded opacity-50" id="player-slot">
-                    <div class="flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
-                        <span>Wachten op Onderzoeker...</span>
-                    </div>
-                    <span class="animate-pulse">...</span>
-                </div>
+            <div id="lobby-players" class="space-y-3 mb-8">
+                <!-- Dynamically filled -->
             </div>
 
             <p class="text-sm text-green-400 animate-pulse">Het spel start automatisch zodra iemand joint.</p>
@@ -242,15 +229,12 @@
 
         // --- 2. AUTHENTICATION ---
         async function initAuth() {
-            // Probeer anoniem in te loggen op jouw project
             try {
-                // Als we in de preview omgeving zitten, proberen we de omgevingstoken,
-                // maar als dat faalt (vanwege project mismatch), vallen we terug op anoniem.
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     try {
                          await auth.signInWithCustomToken(__initial_auth_token);
                     } catch(e) {
-                        console.log("Token auth failed (expected if custom project), using anonymous.");
+                        console.log("Token auth failed, using anonymous.");
                         await auth.signInAnonymously();
                     }
                 } else {
@@ -295,24 +279,24 @@
             currentLobbyId = code;
             myRole = 'host';
 
-            // Create Lobby in Firestore
             try {
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(code).set({
                     hostId: currentUser.uid,
                     joinerId: null,
-                    status: 'waiting', // waiting, setup, playing, finished
+                    status: 'waiting', 
                     animal: '',
                     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-                    questions: [], // { text: "Is het groot?", answer: null | 'ja' | 'nee' | 'misschien' }
+                    questions: [],
                     wrongGuesses: 0,
                     winner: null
                 });
                 
+                // Set code locally immediately
                 document.getElementById('lobby-display-code').textContent = code;
                 subscribeToLobby(code);
             } catch (error) {
                 console.error("Error creating lobby:", error);
-                alert("Kon geen game aanmaken. Probeer het opnieuw. Check console voor permissies.");
+                alert("Kon geen game aanmaken. Probeer het opnieuw.");
             }
         }
 
@@ -337,16 +321,17 @@
                     throw new Error("Game is al bezig of vol");
                 }
 
-                // Join logic
                 if (data.joinerId !== currentUser.uid) {
                     await lobbyRef.update({
                         joinerId: currentUser.uid,
-                        status: 'setup' // Move to setup as soon as joined
+                        status: 'setup'
                     });
                 }
 
                 currentLobbyId = codeInput;
                 myRole = 'joiner';
+                // Set code locally immediately for joiner
+                document.getElementById('lobby-display-code').textContent = codeInput;
                 subscribeToLobby(codeInput);
 
             } catch (error) {
@@ -358,7 +343,6 @@
         function copyCode() {
             const code = document.getElementById('lobby-display-code').textContent;
             navigator.clipboard.writeText(code);
-            // Visual feedback
             const btn = document.querySelector('#lobby-display-code + button');
             const originalIcon = btn.innerHTML;
             btn.innerHTML = '<i class="fas fa-check text-green-400"></i>';
@@ -387,31 +371,62 @@
         }
 
         function handleGameState(data) {
-            // 1. Waiting Room
-            if (data.status === 'waiting') {
-                showScreen('lobby');
-                const playerSlot = document.getElementById('player-slot');
+            // Update Lobby Code Display (safety measure)
+            if (currentLobbyId) {
+                document.getElementById('lobby-display-code').textContent = currentLobbyId;
+            }
+
+            // 1. Waiting Room or Setup Phase (Lobby Visuals)
+            if (data.status === 'waiting' || data.status === 'setup') {
+                if (data.status === 'waiting') showScreen('lobby');
+                // Note: Setup handling logic happens below, but we always update lobby visuals just in case
+                
+                // DYNAMIC LOBBY LIST
+                const playerList = document.getElementById('lobby-players');
+                let hostText = myRole === 'host' ? "Bedenker (Jij)" : "Bedenker";
+                let joinerText = myRole === 'joiner' ? "Onderzoeker (Jij)" : "Onderzoeker";
+                
+                let joinerStatusHtml = '';
                 if (data.joinerId) {
-                    // Start game transition is handled by update in joinGame or host trigger
-                    // But if we are here, usually just waiting
+                    joinerStatusHtml = `
+                        <div class="flex items-center justify-between bg-green-800 p-3 rounded">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
+                                <span>${joinerText}</span>
+                            </div>
+                            <span class="text-green-400"><i class="fas fa-check"></i></span>
+                        </div>`;
+                } else {
+                    joinerStatusHtml = `
+                        <div class="flex items-center justify-between bg-green-800 p-3 rounded opacity-50">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
+                                <span>Wachten op Onderzoeker...</span>
+                            </div>
+                            <span class="animate-pulse">...</span>
+                        </div>`;
                 }
+
+                playerList.innerHTML = `
+                    <div class="flex items-center justify-between bg-green-800 p-3 rounded">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center"><i class="fas fa-crown text-white"></i></div>
+                            <span class="font-bold">${hostText}</span>
+                        </div>
+                        <span class="text-green-400"><i class="fas fa-check"></i></span>
+                    </div>
+                    ${joinerStatusHtml}
+                `;
             }
             
-            // 2. Setup (Host chooses animal)
-            else if (data.status === 'setup') {
+            // 2. Setup Specifics
+            if (data.status === 'setup') {
                 if (myRole === 'host') {
                     showScreen('setup');
                 } else {
-                    // Joiner waits screen styled as lobby but with specific text
+                    // Joiner stays on lobby screen but text updates
                     showScreen('lobby');
                     document.querySelector('#screen-lobby h2').textContent = "Bedenker kiest dier...";
-                    document.getElementById('player-slot').innerHTML = `
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-user text-white"></i></div>
-                            <span>Onderzoeker (Jij)</span>
-                        </div>
-                        <span class="text-green-400"><i class="fas fa-check"></i></span>
-                    `;
                 }
             }
 
@@ -424,10 +439,18 @@
             // 4. Finished
             else if (data.status === 'finished') {
                 showScreen('result');
-                const iWon = (data.winner === myRole);
+                
+                // CORRECT WINNER CHECK logic
+                // data.winner can be 'onderzoeker' or 'bedenker'
+                // myRole can be 'host' or 'joiner'
+                // Host = Bedenker, Joiner = Onderzoeker
+                
+                let iWon = false;
+                if (myRole === 'host' && data.winner === 'bedenker') iWon = true;
+                if (myRole === 'joiner' && data.winner === 'onderzoeker') iWon = true;
+
                 const title = document.getElementById('result-title');
                 const icon = document.getElementById('result-icon');
-                const msg = document.getElementById('result-message');
                 const animalReveal = document.getElementById('reveal-animal');
 
                 animalReveal.textContent = data.animal;
