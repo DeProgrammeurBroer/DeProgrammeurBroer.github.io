@@ -70,6 +70,7 @@
             padding: 4px 8px;
             border-radius: 4px;
             z-index: 0;
+            white-space: nowrap;
         }
 
         @keyframes popIn {
@@ -337,7 +338,7 @@
     </div>
 
     <!-- 2. LOGIN SCREEN -->
-    <div id="screen-login" class="screen overflow-y-auto">
+    <div id="screen-login" class="screen overflow-y-auto relative">
         <div class="w-full max-w-md p-4">
             <h1 class="text-4xl font-bold text-yellow-600 mb-2 text-center">Ik zie ik zie... 👁️</h1>
             <h2 class="text-xl text-yellow-800 mb-8 font-light text-center">Manon eet brie 🧀</h2>
@@ -365,11 +366,21 @@
                 </div>
             </div>
         </div>
+        
+        <!-- DEBUG BUTTON (Hidden trigger) -->
+        <button id="btn-debug-login" class="absolute bottom-4 right-4 text-gray-300 hover:text-gray-500 opacity-50 hover:opacity-100 transition-all text-sm p-4 z-50">
+            <i class="fas fa-bug"></i>
+        </button>
     </div>
 
     <!-- 3. LOBBY SCREEN -->
     <div id="screen-lobby" class="screen bg-white overflow-y-auto relative">
         
+        <!-- LEAVE LOBBY BUTTON -->
+        <button id="btn-leave-lobby" class="absolute top-4 left-20 bg-red-100 text-red-500 w-12 h-12 rounded-full shadow-lg z-30 flex items-center justify-center text-xl hover:bg-red-200 transition-colors border-2 border-white">
+            <i class="fas fa-times"></i>
+        </button>
+
         <!-- FLOATING CHAT TOGGLE (Top-Left) -->
         <button id="btn-chat-toggle" class="absolute top-4 left-4 bg-yellow-400 text-yellow-900 w-12 h-12 rounded-full shadow-lg z-30 flex items-center justify-center text-xl hover:scale-110 transition-transform active:scale-95">
             <i class="fas fa-comment-dots"></i>
@@ -475,8 +486,8 @@
                         Start Spel 🧀
                     </button>
                     
-                    <!-- DEBUG BUTTON -->
-                    <button id="btn-add-bot" class="w-full py-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 border-2 border-blue-300 border-dashed transition-colors flex items-center justify-center">
+                    <!-- DEBUG BUTTON (HIDDEN BY DEFAULT) -->
+                    <button id="btn-add-bot" class="hidden w-full py-3 bg-blue-50 text-blue-600 rounded-lg text-sm font-bold hover:bg-blue-100 border-2 border-blue-300 border-dashed transition-colors flex items-center justify-center">
                         <i class="fas fa-robot mr-2"></i> Voeg Test-Bot toe (Debug)
                     </button>
                 </div>
@@ -526,6 +537,9 @@
 
     <!-- 4. SETUP SCREEN (SEEKER - Classic) -->
     <div id="screen-setup" class="screen bg-yellow-50">
+        <button id="btn-leave-setup" class="absolute top-4 left-4 bg-red-100 text-red-500 w-10 h-10 rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-red-200 transition-colors">
+             <i class="fas fa-times"></i>
+        </button>
         <div class="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md text-center mx-4">
             <h2 class="text-2xl font-bold text-yellow-800 mb-2">Jij bent de Kiezer!</h2>
             <p class="text-gray-600 mb-6">Kies een object uit je omgeving.</p>
@@ -548,8 +562,14 @@
     </div>
 
     <!-- 6. GAME SCREEN (GUESSER - Classic) -->
-    <div id="screen-game-guesser" class="screen transition-colors duration-500">
-        <div class="absolute inset-0 flex flex-col justify-center items-center p-4">
+    <div id="screen-game-guesser" class="screen transition-colors duration-500 overflow-hidden">
+        <button id="btn-leave-guesser" class="absolute top-4 left-4 bg-red-100 text-red-500 w-10 h-10 rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-red-200 transition-colors">
+             <i class="fas fa-times"></i>
+        </button>
+        <!-- Floating Words Container for Guesser -->
+        <div id="guesser-words-container" class="absolute inset-0 overflow-hidden pointer-events-none z-0"></div>
+
+        <div class="absolute inset-0 flex flex-col justify-center items-center p-4 z-10">
             
             <div class="bg-white/95 p-6 rounded-2xl shadow-2xl w-full max-w-lg backdrop-blur-sm border border-white/20">
                 <h3 class="text-center text-gray-800 font-bold mb-4">Raad het object met deze kleur!</h3>
@@ -579,6 +599,9 @@
 
     <!-- 7. GAME SCREEN (SEEKER - Classic) -->
     <div id="screen-game-seeker" class="screen bg-gray-50 overflow-hidden">
+        <button id="btn-leave-seeker" class="absolute top-4 left-4 bg-red-100 text-red-500 w-10 h-10 rounded-full shadow-lg z-50 flex items-center justify-center hover:bg-red-200 transition-colors">
+             <i class="fas fa-times"></i>
+        </button>
         <div id="wrong-guesses-container" class="absolute inset-0 overflow-hidden pointer-events-none"></div>
         <div class="z-10 bg-white p-6 rounded-2xl shadow-xl text-center border-4 border-yellow-400 max-w-sm w-full mx-4">
             <h3 class="text-gray-500 text-sm uppercase tracking-wide">Het geheime woord</h3>
@@ -649,6 +672,9 @@
         let spamInterval = null; 
         const appId = "ik-zie-ik-zie-manon";
         let authTimeout = null;
+        
+        // Debug Mode State
+        let isDebugMode = false;
 
         // Settings State
         let sfxEnabled = true;
@@ -827,7 +853,40 @@
             return Math.random().toString(36).substring(2, 6).toUpperCase();
         }
 
+        // Safe spawn for Guesser to avoid center input
+        function getSafePosition(avoidCenter = false) {
+            if (!avoidCenter) {
+                const top = Math.random() * 80 + 10; 
+                const left = Math.random() * 80 + 10; 
+                return { top: top + '%', left: left + '%' };
+            } else {
+                // Return positions in 4 edge zones: Top, Bottom, Left, Right
+                const zones = ['top', 'bottom', 'left', 'right'];
+                const zone = zones[Math.floor(Math.random() * zones.length)];
+                let top, left;
+
+                // Margins to keep it safe from center card
+                // Card is roughly center 50x50 area
+                if(zone === 'top') {
+                     top = Math.random() * 20 + 5; // 5% to 25%
+                     left = Math.random() * 90 + 5;
+                } else if(zone === 'bottom') {
+                     top = Math.random() * 20 + 75; // 75% to 95%
+                     left = Math.random() * 90 + 5;
+                } else if (zone === 'left') {
+                     top = Math.random() * 90 + 5;
+                     left = Math.random() * 15 + 2; // 2% to 17%
+                } else { // right
+                     top = Math.random() * 90 + 5;
+                     left = Math.random() * 15 + 83; // 83% to 98%
+                }
+                
+                return { top: top + '%', left: left + '%' };
+            }
+        }
+
         function getRandomPosition() {
+            // Legacy for Seeker (doesn't have input in middle covering things)
             const top = Math.random() * 80 + 10; 
             const left = Math.random() * 80 + 10; 
             return { top: top + '%', left: left + '%' };
@@ -935,6 +994,56 @@
                 if (document.exitFullscreen) document.exitFullscreen();
             }
         });
+        
+        // --- DEBUG MODE TOGGLE ---
+        document.getElementById('btn-debug-login').addEventListener('click', () => {
+            const pw = prompt("🔐 Voer wachtwoord in voor Debug Mode:");
+            if (pw === "Vuurwerk2025") {
+                isDebugMode = true;
+                showToast("Debug Mode: AAN 🤖");
+                // Play sound
+                sfx.win();
+            } else if (pw !== null) {
+                showToast("❌ Fout wachtwoord");
+                sfx.wrong();
+            }
+        });
+
+        // --- LEAVE LOBBY / GAME LOGIC ---
+        async function leaveGame() {
+            if (!currentRoomId || !currentUser) return;
+            
+            try {
+                // Fetch current room to remove self
+                const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId);
+                const snap = await getDoc(roomRef);
+                if (snap.exists()) {
+                    const data = snap.data();
+                    const newPlayers = data.players.filter(p => p.uid !== currentUser.uid);
+                    
+                    if (newPlayers.length === 0) {
+                        // Keep room but maybe mark empty? For now just empty players
+                    }
+                    
+                    await updateDoc(roomRef, { players: newPlayers });
+                }
+            } catch (e) {
+                console.error("Leave error:", e);
+            }
+            
+            // Reset Local State
+            currentRoomId = null;
+            if(unsubscribeRoom) unsubscribeRoom();
+            renderedGuessesCount = 0;
+            document.getElementById('guesser-words-container').innerHTML = '';
+            document.getElementById('wrong-guesses-container').innerHTML = '';
+            showScreen('login');
+        }
+
+        document.getElementById('btn-leave-lobby').addEventListener('click', leaveGame);
+        document.getElementById('btn-leave-setup').addEventListener('click', leaveGame);
+        document.getElementById('btn-leave-guesser').addEventListener('click', leaveGame);
+        document.getElementById('btn-leave-seeker').addEventListener('click', leaveGame);
 
         // --- CHEESE MINIGAME LOGIC ---
         const cheeseItems = [
@@ -1371,6 +1480,7 @@
                 const hostControls = document.getElementById('host-controls');
                 const waitingMsg = document.getElementById('waiting-msg');
                 const selSeeker = document.getElementById('sel-seeker');
+                const btnAddBot = document.getElementById('btn-add-bot');
                 
                 // HOST CONTROL LOGIC UPDATE
                 if (amHost) {
@@ -1378,9 +1488,13 @@
 
                     if (players.length < 2) {
                         // LESS THAN 2 PLAYERS
-                        // Show Bot Button
-                        document.getElementById('btn-add-bot').classList.remove('hidden');
-                        document.getElementById('btn-add-bot').style.display = 'flex'; // Use flex for icon alignment
+                        
+                        // Show Bot Button ONLY if Debug Mode is ON
+                        if (isDebugMode) {
+                            btnAddBot.classList.remove('hidden');
+                        } else {
+                            btnAddBot.classList.add('hidden');
+                        }
                         
                         // Hide Start Game
                         document.getElementById('btn-start-game').classList.add('hidden');
@@ -1391,7 +1505,7 @@
                         waitingMsg.innerText = "Wachten op speler 2...";
                     } else {
                         // ROOM FULL
-                        document.getElementById('btn-add-bot').classList.add('hidden');
+                        btnAddBot.classList.add('hidden');
                         document.getElementById('btn-start-game').classList.remove('hidden');
                         document.getElementById('sel-gamemode').parentElement.classList.remove('hidden');
                         document.getElementById('sel-seeker').parentElement.classList.remove('hidden');
@@ -1479,11 +1593,33 @@
             document.getElementById('screen-game-guesser').style.backgroundColor = color;
             const hintBtn = document.getElementById('btn-request-hint');
             const hintBox = document.getElementById('guesser-hint-box');
+            
+            // SHOW GUESSES FOR GUESSER TOO (Safe Zone Logic)
+            const guesses = data.gameData.guesses || [];
+            if (guesses.length > renderedGuessesCount) {
+                // Ensure we are currently viewing the guesser screen before spawning
+                if(document.getElementById('screen-game-guesser').classList.contains('active')) {
+                     const container = document.getElementById('guesser-words-container');
+                     // Only spawn the *new* ones since last render
+                     for (let i = renderedGuessesCount; i < guesses.length; i++) {
+                         spawnFloatingWord(guesses[i], container, true); // true = avoid center
+                     }
+                }
+                
+                // If we are Seeker, the other update function handles it, so we rely on shared renderedGuessesCount updates at end of cycle
+                // But since updateSeekerScreen also runs if we are seeker, we need to be careful not to double count if logic was shared.
+                // However, handleRoomUpdate splits logic by role.
+                // So if I am guesser, I update here.
+            }
+
             if (data.gameData.hintRequested && !data.gameData.hintGiven) {
                 hintBtn.innerText = "Hint aangevraagd..."; hintBtn.disabled = true; hintBtn.classList.add('text-gray-400');
             } else if (data.gameData.hintGiven) {
                 hintBox.classList.remove('hidden'); document.getElementById('guesser-hint-text').innerText = data.gameData.hintGiven; hintBtn.style.display = 'none';
             }
+            
+            // Update counter locally if I am guesser
+            if(myRole === 'guesser') renderedGuessesCount = guesses.length;
         }
 
         function updateSeekerScreen(data) {
@@ -1491,7 +1627,7 @@
             const guesses = data.gameData.guesses || [];
             if (guesses.length > renderedGuessesCount) {
                 const container = document.getElementById('wrong-guesses-container');
-                for (let i = renderedGuessesCount; i < guesses.length; i++) spawnFloatingWord(guesses[i], container);
+                for (let i = renderedGuessesCount; i < guesses.length; i++) spawnFloatingWord(guesses[i], container, false);
                 
                 // Audio & Shake for wrong guesses
                 if (renderedGuessesCount > 0) { // skip initial load
@@ -1518,7 +1654,7 @@
                 if (effect === 'spam' && trollData && !spamInterval) {
                     const container = document.getElementById('wrong-guesses-container');
                     spamInterval = setInterval(() => {
-                        spawnFloatingWord(trollData, container);
+                        spawnFloatingWord(trollData, container, false);
                         sfx.spam(); // Beep on spam
                     }, 200);
                     setTimeout(() => { if (spamInterval) { clearInterval(spamInterval); spamInterval = null; } }, 10000);
@@ -1529,10 +1665,11 @@
             else hintModal.classList.add('translate-y-full');
         }
 
-        function spawnFloatingWord(text, container) {
+        function spawnFloatingWord(text, container, avoidCenter = false) {
             const el = document.createElement('div');
             el.classList.add('floating-word'); el.innerText = text;
-            const pos = getRandomPosition();
+            // Use safe position if avoidCenter is true (for Guesser)
+            const pos = getSafePosition(avoidCenter); 
             el.style.top = pos.top; el.style.left = pos.left; el.style.transform = `rotate(${Math.random() * 40 - 20}deg)`;
             container.appendChild(el);
         }
@@ -1586,7 +1723,8 @@
         });
         document.getElementById('btn-send-hint').addEventListener('click', async () => {
             const hint = document.getElementById('inp-give-hint').value.trim();
-            if (!hint || hint.includes(" ")) return showToast("1 woord aub!");
+            if (!hint) return showToast("Vul iets in!");
+            // 1-word limit check removed!
             const roomRef = doc(db, 'artifacts', appId, 'public', 'data', 'rooms', currentRoomId); await updateDoc(roomRef, { 'gameData.hintGiven': hint });
         });
         document.getElementById('btn-reset').addEventListener('click', async () => {
@@ -1596,7 +1734,7 @@
                 'gameData.hintRequested': false, 'gameData.hintGiven': '', 'gameData.winner': null, 'gameData.winnerName': null,
                 'gameData.trollEffect': null
             });
-            renderedGuessesCount = 0; document.getElementById('wrong-guesses-container').innerHTML = "";
+            renderedGuessesCount = 0; document.getElementById('wrong-guesses-container').innerHTML = ""; document.getElementById('guesser-words-container').innerHTML = "";
             document.getElementById('inp-guess').value = ""; document.getElementById('inp-secret-word').value = ""; document.getElementById('inp-give-hint').value = "";
             document.getElementById('guesser-hint-box').classList.add('hidden'); document.getElementById('dynamic-comment').innerText = "";
             document.getElementById('btn-request-hint').style.display = 'block'; document.getElementById('btn-request-hint').disabled = false;
