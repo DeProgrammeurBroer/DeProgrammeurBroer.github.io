@@ -119,6 +119,23 @@
             max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto;
             border: 4px solid #5d4037; text-align: center;
         }
+        
+        /* Kaartstijl */
+        .card-button {
+            width: 50px; height: 70px; 
+            border: 1px solid #3e2723;
+            border-radius: 4px;
+            padding: 2px;
+            text-align: center;
+            line-height: 1.2;
+            font-size: 1.2em;
+        }
+        .card-button:hover {
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .card-red { color: red; }
+        .card-black { color: black; }
+
 
         /* Responsive */
         @media (max-width: 1000px) {
@@ -178,8 +195,10 @@
                 <div class="grid grid-cols-2 gap-2 mb-4">
                     <button onclick="hostGame('tictactoe')" class="tavern-btn btn-small rounded py-2">❌⭕ Boter Kaas</button>
                     <button onclick="hostGame('hangman')" class="tavern-btn btn-small rounded py-2">🔤 Galgje</button>
-                    <button onclick="alert('De kaarten worden nog geschud! (Binnenkort beschikbaar)')" class="tavern-btn btn-small rounded py-2 opacity-70">🃏 Pesten</button>
-                    <button class="tavern-btn btn-small rounded py-2 opacity-50 cursor-not-allowed">🎲 Dobbelen</button>
+                    <!-- NIEUW: PESTEN -->
+                    <button onclick="hostGame('pesten')" class="tavern-btn btn-small rounded py-2">🃏 Pesten</button>
+                    <!-- NIEUW: DOBBELEN -->
+                    <button onclick="hostGame('dice')" class="tavern-btn btn-small rounded py-2">🎲 Dobbelen</button>
                 </div>
 
                 <h3 class="text-sm font-bold text-amber-800 mb-1 uppercase tracking-wide">Open Tafels:</h3>
@@ -194,7 +213,8 @@
     <!-- GAME MODAL (Overlay) -->
     <div id="game-modal" class="modal-overlay">
         <div class="modal-content relative">
-            <button onclick="closeGameModal()" class="absolute top-2 right-2 text-red-800 font-bold hover:text-red-600">✖ Sluiten</button>
+            <!-- AANGEPAST: userQuitGame roept nu de verwijder-logica aan -->
+            <button onclick="userQuitGame()" class="absolute top-2 right-2 text-red-800 font-bold hover:text-red-600 border border-red-800 rounded px-2 bg-red-100">✖ Verlaten</button>
             <div id="game-stage">
                 <!-- Dynamische Game Content komt hier -->
             </div>
@@ -229,6 +249,31 @@
         localStorage.setItem('tavern_username', myUsername);
         let activeGameListener = null;
         let currentGameId = null;
+
+        // Helper function (was missing before, caused bugs)
+        window.isMyGame = function(g) {
+            if(!currentUser) return false;
+            return g.hostUid === currentUser.uid || g.guestUid === currentUser.uid;
+        };
+        
+        // --- NEW HELPER: PESTEN DECK INITIALIZATION ---
+        function initializeDeck() {
+            const suits = ['♥', '♦', '♣', '♠'];
+            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+            let deck = [];
+            for (const suit of suits) {
+                for (const rank of ranks) { deck.push(rank + suit); }
+            }
+            // Voeg twee jokers toe
+            deck.push('Joker', 'Joker'); 
+            
+            // Schud de kaarten
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
 
         // 2. AUTHENTICATION
         const initAuth = async () => {
@@ -304,6 +349,26 @@
         function getInitialState(type) {
             if(type === 'tictactoe') return { board: Array(9).fill(''), turn: 'X', winner: null };
             if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, setter: 'host', phase: 'setup' }; // phase: setup or guessing
+            
+            // NIEUW: PESTEN
+            if(type === 'pesten') return { 
+                turn: 'host', // host starts
+                deck: [], // Wordt gevuld bij start
+                hostHand: [], 
+                guestHand: [], 
+                discardPile: [],
+                status: 'waiting_start' // waiting_start, playing, finished
+            };
+            
+            // NIEUW: DOBBELEN
+            if(type === 'dice') return { 
+                turn: 'host', // host starts
+                hostRoll: null, 
+                guestRoll: null, 
+                winner: null,
+                message: 'Host begint.'
+            };
+
             return {};
         }
 
@@ -315,7 +380,7 @@
                 snap.forEach(d => games.push({id: d.id, ...d.data()}));
                 
                 // Filter: alleen wachtende spellen en recente actieve spellen tonen
-                const activeGames = games.filter(g => g.status === 'waiting' || (g.status === 'playing' && isMyGame(g)));
+                const activeGames = games.filter(g => g.status === 'waiting' || (g.status === 'playing' && window.isMyGame(g)));
                 
                 if(activeGames.length === 0) {
                     listEl.innerHTML = '<div class="text-center italic text-amber-900/50 mt-4">Geen open spellen.</div>';
@@ -324,7 +389,15 @@
 
                 listEl.innerHTML = activeGames.map(g => {
                     const isMine = g.hostUid === currentUser.uid;
-                    const icon = g.type === 'tictactoe' ? '❌⭕' : '🔤';
+                    let icon;
+                    if (g.type === 'tictactoe') icon = '❌⭕';
+                    else if (g.type === 'hangman') icon = '🔤';
+                    else if (g.type === 'pesten') icon = '🃏';
+                    else if (g.type === 'dice') icon = '🎲';
+                    else icon = '❓';
+
+                    const gameName = g.type === 'tictactoe' ? 'Boter Kaas' : g.type === 'hangman' ? 'Galgje' : g.type === 'pesten' ? 'Pesten' : g.type === 'dice' ? 'Dobbelen' : 'Spel';
+                    
                     const btnText = isMine ? 'Wachten...' : 'Meespelen';
                     const btnClass = isMine ? 'opacity-50 cursor-default' : 'hover:bg-amber-700';
                     const action = isMine ? '' : `onclick="joinGame('${g.id}')"`;
@@ -340,7 +413,7 @@
                     return `
                     <div class="game-card">
                         <div class="flex flex-col">
-                            <span class="font-bold text-sm text-amber-900">${icon} ${g.type === 'tictactoe' ? 'Boter Kaas' : 'Galgje'}</span>
+                            <span class="font-bold text-sm text-amber-900">${icon} ${gameName}</span>
                             <span class="text-xs text-amber-900/60">Host: ${g.host}</span>
                         </div>
                         <button ${action} class="tavern-btn btn-small rounded ${btnClass}">${btnText}</button>
@@ -356,17 +429,24 @@
                 guest: myUsername,
                 status: 'playing'
             });
-            // Haal type op om UI te openen (hacky manier zonder getDoc voor snelheid)
-            // We vertrouwen erop dat de listener de UI update, maar we forceren open:
-            // Voor nu even simpel: de snapshot in openGameUI handlet dit.
-             // We moeten weten welk type het is.
-             // Simpele fix: we openen de UI, de data laadt daar.
              openGameUI(gameId, null, 'guest'); 
         };
 
         window.rejoinGame = (id, type) => openGameUI(id, type, 'player');
 
         // 5. GAME PLAY UI
+        
+        // Functie voor als gebruiker zelf op 'Sluiten' klikt
+        window.userQuitGame = async () => {
+            if(currentGameId) {
+                // Verwijder game uit DB zodat hij offline gaat voor iedereen
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', currentGameId));
+                } catch(e) { console.log("Game al weg of error", e); }
+            }
+            closeGameModal();
+        };
+
         window.closeGameModal = () => {
             document.getElementById('game-modal').style.display = 'none';
             if(activeGameListener) activeGameListener(); // Unsubscribe
@@ -382,8 +462,9 @@
             stage.innerHTML = '<div class="text-2xl animate-pulse">Spel laden...</div>';
 
             activeGameListener = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId), (docSnap) => {
+                // Als document verwijderd is (door userQuitGame van iemand)
                 if(!docSnap.exists()) {
-                    stage.innerHTML = "Spel is beëindigd.";
+                    stage.innerHTML = "<div class='text-red-800 font-bold text-xl'>Tafel is gesloten.</div>";
                     setTimeout(closeGameModal, 2000);
                     return;
                 }
@@ -397,7 +478,8 @@
             const amIHost = game.hostUid === currentUser.uid;
             
             // Header
-            let html = `<h2 class="text-3xl tavern-font mb-4 text-amber-900">${game.type === 'tictactoe' ? 'Boter, Kaas & Eieren' : 'Galgje'}</h2>`;
+            let gameTitle = game.type === 'tictactoe' ? 'Boter, Kaas & Eieren' : game.type === 'hangman' ? 'Galgje' : game.type === 'pesten' ? 'Pesten' : 'Dobbelen';
+            let html = `<h2 class="text-3xl tavern-font mb-4 text-amber-900">${gameTitle}</h2>`;
             html += `<div class="mb-4 text-amber-800">Spelers: <b>${game.host}</b> vs <b>${game.guest || 'Wachten...'}</b></div>`;
 
             if(game.status === 'waiting') {
@@ -429,7 +511,7 @@
                     </div>`;
                 });
                 html += `</div>`;
-                if(winner) html += `<button onclick="deleteGame('${id}')" class="tavern-btn px-6 py-2 mx-auto mt-4 rounded">Sluit Spel</button>`;
+                if(winner) html += `<button onclick="userQuitGame()" class="tavern-btn px-6 py-2 mx-auto mt-4 rounded">Sluit Spel</button>`;
             } 
 
             // --- HANGMAN RENDER ---
@@ -459,7 +541,7 @@
                     if(won || lost) {
                          const msg = won ? (isSetter ? "Ze hebben het geraden!" : "Je hebt gewonnen!") : (isSetter ? "Ze zijn opgehangen! Jij wint." : `Verloren! Het woord was ${state.word}`);
                          html += `<div class="text-2xl font-bold mb-4">${msg}</div>`;
-                         html += `<button onclick="deleteGame('${id}')" class="tavern-btn px-6 py-2 mx-auto rounded">Sluit Spel</button>`;
+                         html += `<button onclick="userQuitGame()" class="tavern-btn px-6 py-2 mx-auto rounded">Sluit Spel</button>`;
                     } else if (!isSetter) {
                         // Keyboard for guesser
                         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
@@ -478,6 +560,105 @@
                     }
                 }
             }
+            
+            // --- NIEUW: PESTEN RENDER ---
+            else if(game.type === 'pesten') {
+                const state = game.state;
+                const myRole = amIHost ? 'host' : 'guest';
+                const opponentRole = amIHost ? 'guest' : 'host';
+                const isMyTurn = state.turn === myRole;
+                const myHand = state[myRole + 'Hand'];
+                const opponentHandSize = state[opponentRole + 'Hand'] ? state[opponentRole + 'Hand'].length : 0;
+                const topCard = state.discardPile.length > 0 ? state.discardPile[state.discardPile.length - 1] : 'Geen';
+                const topRank = topCard.replace(/[♥♦♣♠]/, '');
+                const topSuit = topCard.slice(-1);
+
+                if (state.status === 'waiting_start') {
+                    html += `<p class="mb-4">Wachten op een tegenstander om te starten...</p>`;
+                    if (amIHost) {
+                        html += `<button onclick="pestenStartGame('${id}')" ${game.guest ? '' : 'disabled'} class="tavern-btn px-6 py-2 rounded mt-2">Start Spel & Deel Kaarten</button>`;
+                    } else {
+                        html += `<p class="animate-pulse text-sm mt-2">Wachten op de host (${game.host}) om te starten.</p>`;
+                    }
+                } else if (state.status === 'finished') {
+                    html += `<div class="text-2xl font-bold text-red-700 mt-4">${state.winner === myRole ? "Je hebt gewonnen!" : `Je hebt verloren. Winnaar: ${game[state.winner]}`}</div>`;
+                    html += `<button onclick="userQuitGame()" class="tavern-btn px-6 py-2 mx-auto mt-4 rounded">Sluit Spel</button>`;
+                } else {
+                    let statusText = isMyTurn ? "Jouw beurt! Speel of pak een kaart." : `Wachten op ${game[state.turn]}...`;
+                    
+                    html += `<div class="text-xl font-bold mb-4 ${isMyTurn ? 'text-green-700' : 'text-amber-900'}">${statusText}</div>`;
+                    html += `<div class="flex justify-around items-center mb-4 text-center border-b pb-4 border-amber-900/20">
+                        <div><span class="text-sm text-amber-800">${game[opponentRole]}</span><br>🃏 x ${opponentHandSize}</div>
+                        <div>
+                            <span class="text-xs text-amber-800">Bovenste Kaart:</span><br>
+                            <span class="text-3xl font-bold ${topSuit === '♥' || topSuit === '♦' ? 'card-red' : 'card-black'}">${topCard}</span>
+                        </div>
+                        <div><span class="text-sm text-amber-800">Deck:</span><br>📦 x ${state.deck.length}</div>
+                    </div>`;
+                    
+                    // My Hand
+                    html += `<h3 class="font-bold mb-2">Jouw Kaarten:</h3>`;
+                    html += `<div class="flex flex-wrap justify-center gap-2 mb-4">`;
+                    myHand.forEach((card, index) => {
+                         const cardRank = card.replace(/[♥♦♣♠]/, '');
+                         const cardSuit = card.slice(-1);
+                         
+                         // Simplified Playability Check
+                         const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+                         
+                         const colorClass = cardSuit === '♥' || cardSuit === '♦' ? 'card-red' : 'card-black';
+                         const enabledClass = isMyTurn && canPlay ? 'bg-white hover:bg-green-100 cursor-pointer' : 'bg-gray-300 opacity-70 cursor-not-allowed';
+
+                         html += `<button 
+                            onclick="pestenPlayCard('${id}', '${card}', ${index})" 
+                            ${!(isMyTurn && canPlay) ? 'disabled' : ''}
+                            class="card-button ${colorClass} ${enabledClass}">
+                            ${card}
+                        </button>`;
+                    });
+                    html += `</div>`;
+                    
+                    // Draw Button
+                    html += `<button onclick="pestenDrawCard('${id}')" ${!isMyTurn ? 'disabled' : ''} class="tavern-btn px-6 py-2 rounded mt-2">
+                        ${isMyTurn ? `Pak een kaart (Deck: ${state.deck.length})` : 'Wachten...'}
+                    </button>`;
+                }
+            }
+
+            // --- NIEUW: DOBBELEN RENDER ---
+            else if(game.type === 'dice') {
+                const state = game.state;
+                const myRole = amIHost ? 'host' : 'guest';
+                const isMyTurn = state.turn === myRole;
+                
+                let statusText = state.message;
+                if (!state.winner && !state.hostRoll && !state.guestRoll) {
+                    statusText = isMyTurn ? "Tijd om te dobbelen!" : `Wachten op ${game[state.turn]} om te gooien...`;
+                }
+
+                html += `<div class="text-xl font-bold mb-4 text-amber-900">${statusText}</div>`;
+                
+                // Dice Display
+                html += `<div class="flex justify-around items-center my-6">
+                    <div class="text-center">
+                        <h3 class="font-bold text-amber-800">${game.host}</h3>
+                        <div class="text-6xl p-4 border border-amber-900/50 rounded inline-block bg-amber-100">${state.hostRoll !== null ? state.hostRoll : '?'}</div>
+                    </div>
+                    <div class="text-center">
+                        <h3 class="font-bold text-amber-800">${game.guest || 'Tegenstander'}</h3>
+                        <div class="text-6xl p-4 border border-amber-900/50 rounded inline-block bg-amber-100">${state.guestRoll !== null ? state.guestRoll : '?'}</div>
+                    </div>
+                </div>`;
+
+                if (state.winner) {
+                    html += `<button onclick="diceNewRound('${id}')" class="tavern-btn px-6 py-2 mx-auto mt-4 rounded">Nieuwe Ronde</button>`;
+                    html += `<button onclick="userQuitGame()" class="tavern-btn px-6 py-2 mx-auto mt-4 rounded bg-red-700">Sluit Spel</button>`;
+                } else if (isMyTurn) {
+                    html += `<button onclick="diceRoll('${id}')" class="tavern-btn px-8 py-3 rounded text-xl animate-pulse">Gooi de Dobbelsteen! 🎲</button>`;
+                } else {
+                    html += `<p class="italic text-sm">Wachten...</p>`;
+                }
+            }
 
             stage.innerHTML = html;
         }
@@ -487,54 +668,8 @@
         // Tic Tac Toe Move
         window.tttMove = async (gameId, index, symbol, allowed) => {
             if(!allowed) return;
-            
-            // We need to read current state first to be safe (or pass complete state)
-            // For simplicity we trust the click but ideally we use transactions.
-            // Since we can't easily do transactions with just updateDoc on a deeply nested field without reading,
-            // we rely on the visual state. *Proper implementation needs transaction*.
-            // Here: Read from memory of last snapshot for responsiveness
-            
-            // Fetch fresh doc to be sure
-            // NOTE: In strict Firestore, use runTransaction. Here simple update.
-            // We assume 'game' variable is not available here globally easily without re-fetching or passing huge args.
-            // Let's just do a quick hack: we assume the board passed in args logic is correct.
-            
-            // To do this right in 1 file:
-            // We will fetch the doc inside this function.
-            // Because we are inside a module, we can't easily access the 'game' object from render.
-            // But we know the logic.
-            
-            // Actually, we can just update the specific field using dot notation? 
-            // Firestore allows "state.board": ... but arrays are tricky.
-            // Let's read, modify, write.
-            // But we can't await inside the onclick easily in HTML string.
-            // So we made the function async.
-            
-            // Wait, we need the doc data.
-            // Let's just create a simplified transactional update helper.
-            // Or simpler: The user clicks, we fetch, check, update.
-            // It might be slightly slow but safer.
+            // Note: Handled in separate script block due to module/scope, see below
         };
-        
-        // BETTER IMPLEMENTATION FOR TTT MOVE (Attached to window)
-        window.tttMove = async (id, idx, symbol, allowed) => {
-            if(!allowed) return;
-            // Optimistic UI update could go here
-            
-            // 1. Get current state
-            // We need a ref.
-            // Since we don't have the doc locally in this scope easily, we rely on a helper to get it or just use the global 'activeGameListener's last known state? No, that's messy.
-            // Let's just getDoc. (Sorry Rule 2, but getDoc is fine for single doc).
-            // Wait, I didn't import getDoc. I'll add it to imports or use a trick.
-            // Trick: use `onSnapshot` once? No. 
-            // I will add getDoc to imports in the script tag.
-        };
-        
-        // Helper to update TTT
-        // Since I cannot easily change the imports in the generated string block without regenerating everything, 
-        // I will implement a "blind write" logic or use the `updateDoc` with logic if possible.
-        // Actually, TTT logic requires knowing if the cell is empty.
-        // I will add `getDoc` to the imports list in the code above.
         
         // Hangman Actions
         window.hangmanSetWord = async (id) => {
@@ -548,9 +683,7 @@
         };
 
         window.hangmanGuess = async (id, letter) => {
-             // We need to check if letter is in word.
-             // This requires reading the doc.
-             // See note below about getDoc.
+             // Handled in separate script block
         };
         
         window.deleteGame = async (id) => {
@@ -567,6 +700,7 @@
     <script type="module">
         import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'; // <-- TOEGEVOEGD
         
         const firebaseConfig = {
             apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
@@ -580,6 +714,18 @@
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        const auth = getAuth(app); // <-- TOEGEVOEGD
+        
+        // Pesten helper om kaart te verwijderen
+        function removeCard(hand, cardToRemove) {
+            const index = hand.indexOf(cardToRemove);
+            if (index > -1) {
+                hand.splice(index, 1);
+                return true;
+            }
+            return false;
+        }
 
         // TTT LOGIC
         window.tttMove = async (id, idx, symbol, allowed) => {
@@ -621,6 +767,149 @@
                 state.mistakes++;
             }
             
+            await updateDoc(ref, { state: state });
+        };
+        
+        // NIEUW: PESTEN LOGIC
+        window.pestenStartGame = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists() || !snap.data().guest) return;
+            let data = snap.data();
+            let state = data.state;
+            
+            if (state.status !== 'waiting_start') return;
+
+            // Roep de globale initializeDeck aan
+            const fullDeck = window.initializeDeck ? window.initializeDeck() : []; 
+            if (fullDeck.length < 15) { // Minimaal 15 kaarten nodig
+                console.error("Deck te klein of niet geladen.");
+                return;
+            }
+            state.deck = fullDeck;
+            state.hostHand = state.deck.splice(0, 7);
+            state.guestHand = state.deck.splice(0, 7);
+
+            // Speel eerste kaart
+            let firstCard = state.deck.splice(0, 1)[0];
+            state.discardPile.push(firstCard);
+            state.status = 'playing';
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenPlayCard = async (id, card, index) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+
+            const topCard = state.discardPile[state.discardPile.length - 1];
+            const cardRank = card.replace(/[♥♦♣♠]/, '');
+            const topRank = topCard.replace(/[♥♦♣♠]/, '');
+            const cardSuit = card.slice(-1);
+            const topSuit = topCard.slice(-1);
+
+            // Simplified Playability Check (Match Rank or Suit, or Special Card)
+            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+
+            if (!canPlay) { return; } // Should not happen if button is disabled correctly
+
+            // Move card from hand to discard pile
+            state.discardPile.push(card);
+            removeCard(state[myRole + 'Hand'], card);
+            
+            // Check for win
+            if (state[myRole + 'Hand'].length === 0) {
+                state.winner = myRole;
+                state.status = 'finished';
+            } else {
+                // Change turn (simplified)
+                state.turn = opponentRole;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenDrawCard = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+            if (state.deck.length === 0) return;
+
+            const drawnCard = state.deck.splice(0, 1)[0];
+            state[myRole + 'Hand'].push(drawnCard);
+
+            // Turn change is MANDATORY after drawing
+            state.turn = opponentRole;
+
+            await updateDoc(ref, { state: state });
+        };
+
+        // NIEUW: DICE LOGIC
+        window.diceRoll = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+            
+            if (state.turn !== myRole || state.winner) return;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            state[myRole + 'Roll'] = roll;
+            
+            // Check for winner if both have rolled
+            if (state.hostRoll !== null && state.guestRoll !== null) {
+                if (state.hostRoll > state.guestRoll) {
+                    state.winner = 'host';
+                    state.message = `${data.host} wint met ${state.hostRoll} tegen ${state.guestRoll}!`;
+                } else if (state.guestRoll > state.hostRoll) {
+                    state.winner = 'guest';
+                    state.message = `${data.guest} wint met ${state.guestRoll} tegen ${state.hostRoll}!`;
+                } else {
+                    state.winner = 'DRAW';
+                    state.message = 'Gelijkspel, gooi opnieuw voor de volgende ronde!';
+                }
+            } else {
+                // Change turn
+                state.turn = opponentRole;
+                state.message = `Wachten op ${data[opponentRole]} om te gooien.`;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.diceNewRound = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+
+            // Reset rolls and winner, keeping current turn or switching turn for next game
+            state.hostRoll = null;
+            state.guestRoll = null;
+            state.winner = null;
+            state.turn = state.turn === 'host' ? 'guest' : 'host'; // Switch who starts the next round
+            state.message = `${data[state.turn]} begint de nieuwe ronde. Gooi nu!`;
+
             await updateDoc(ref, { state: state });
         };
     </script>
