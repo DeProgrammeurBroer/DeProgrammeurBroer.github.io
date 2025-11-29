@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ra Ra Raad het Dier 🦁</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Bangers&family=Nunito:wght@400;700&display=swap');
+
+        body {
+            font-family: 'Nunito', sans-serif;
+            background-color: #0f281e; /* Jungle dark green */
+            background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%231a3c2b' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+            color: #e2e8f0;
+        }
+
+        h1, h2, .jungle-font {
+            font-family: 'Bangers', cursive;
+            letter-spacing: 2px;
+        }
+
+        .btn-jungle {
+            background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+            border: 4px solid #78350f;
+            box-shadow: 0 4px 0 #78350f;
+            transition: all 0.1s;
+        }
+
+        .btn-jungle:active {
+            transform: translateY(4px);
+            box-shadow: 0 0 0 #78350f;
+        }
+
+        .card-jungle {
+            background-color: rgba(22, 60, 43, 0.95);
+            border: 2px solid #3d8c65;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        }
+
+        .chat-bubble {
+            position: relative;
+            background: #2d5a45;
+            border-radius: .4em;
+        }
+
+        .chat-bubble:after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border: 10px solid transparent;
+            border-top-color: #2d5a45;
+            border-bottom: 0;
+            margin-left: -10px;
+            margin-bottom: -10px;
+        }
+
+        /* Leaf decoration */
+        .leaf {
+            position: absolute;
+            width: 50px;
+            height: 50px;
+            background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%234ade80'%3E%3Cpath d='M12 2C7.5 2 4 6.5 4 12s5.5 10 10 10c4.5 0 8-3.5 8-8 0-6.5-5.5-12-10-12zm0 18c-3.5 0-7-2.5-7-8s2.5-8 7-8 7 3.5 7 8-3.5 8-7 8z'/%3E%3C/svg%3E") no-repeat center/contain;
+            opacity: 0.1;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <!-- Leaf Decorations -->
+    <div class="leaf top-0 left-0 transform rotate-45"></div>
+    <div class="leaf top-0 right-0 transform -rotate-45"></div>
+    <div class="leaf bottom-0 left-0 transform rotate-135"></div>
+    <div class="leaf bottom-0 right-0 transform -rotate-135"></div>
+
+    <div id="app" class="w-full max-w-md">
+        <!-- Loading State -->
+        <div id="loading" class="text-center">
+            <i class="fas fa-spinner fa-spin text-4xl text-green-400 mb-4"></i>
+            <p class="text-xl jungle-font text-green-200">De jungle wordt geladen...</p>
+        </div>
+
+        <!-- Home Screen -->
+        <div id="screen-home" class="hidden card-jungle rounded-xl p-8 text-center relative overflow-hidden">
+            <h1 class="text-5xl text-yellow-400 mb-2 drop-shadow-md">RA RA<br><span class="text-green-400">RAAD HET DIER</span></h1>
+            <p class="text-green-200 mb-8 italic">Wie is de koning van de jungle?</p>
+            
+            <div class="space-y-4">
+                <button onclick="createGame()" class="btn-jungle w-full py-4 rounded-lg text-white text-2xl font-bold tracking-wider hover:brightness-110">
+                    <i class="fas fa-plus-circle mr-2"></i> NIEUW SPEL
+                </button>
+                <div class="relative">
+                    <div class="absolute inset-0 flex items-center">
+                        <div class="w-full border-t border-green-700"></div>
+                    </div>
+                    <div class="relative flex justify-center text-sm">
+                        <span class="px-2 bg-[#163c2b] text-green-400">OF</span>
+                    </div>
+                </div>
+                <div class="flex gap-2">
+                    <input type="text" id="join-code" placeholder="CODE" maxlength="4" class="w-24 bg-green-900 border-2 border-green-700 text-center text-white text-xl rounded-lg focus:outline-none focus:border-yellow-500 uppercase font-bold placeholder-green-700">
+                    <button onclick="joinGame()" class="flex-1 bg-green-700 hover:bg-green-600 border-b-4 border-green-900 text-white font-bold py-3 px-4 rounded-lg transition-all">
+                        <i class="fas fa-sign-in-alt mr-2"></i> JOINEN
+                    </button>
+                </div>
+            </div>
+            <p id="home-error" class="text-red-400 mt-4 text-sm hidden"></p>
+        </div>
+
+        <!-- Lobby / Waiting -->
+        <div id="screen-lobby" class="hidden card-jungle rounded-xl p-8 text-center">
+            <h2 class="text-3xl text-yellow-400 mb-6 jungle-font">JUNGLE LOBBY</h2>
+            
+            <div class="bg-green-900/50 p-4 rounded-lg border border-green-700 mb-6">
+                <p class="text-green-300 text-sm mb-1 uppercase tracking-wide">Deel deze code:</p>
+                <div class="flex justify-center items-center gap-3">
+                    <span id="lobby-display-code" class="text-5xl font-mono font-bold text-white tracking-widest">????</span>
+                    <button onclick="copyCode()" class="text-green-400 hover:text-white transition"><i class="far fa-copy fa-lg"></i></button>
+                </div>
+            </div>
+
+            <div class="space-y-3 mb-8">
+                <div class="flex items-center justify-between bg-green-800 p-3 rounded">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center"><i class="fas fa-crown text-white"></i></div>
+                        <span class="font-bold">Bedenker (Jij)</span>
+                    </div>
+                    <span class="text-green-400"><i class="fas fa-check"></i></span>
+                </div>
+                <div class="flex items-center justify-between bg-green-800 p-3 rounded opacity-50" id="player-slot">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
+                        <span>Wachten op Onderzoeker...</span>
+                    </div>
+                    <span class="animate-pulse">...</span>
+                </div>
+            </div>
+
+            <p class="text-sm text-green-400 animate-pulse">Het spel start automatisch zodra iemand joint.</p>
+        </div>
+
+        <!-- Setup (Host only) -->
+        <div id="screen-setup" class="hidden card-jungle rounded-xl p-6 text-center">
+            <h2 class="text-2xl text-yellow-400 mb-4 jungle-font">KIES JE DIER!</h2>
+            <p class="text-green-200 mb-4">Jij bent de Bedenker. Welk dier moet de ander raden?</p>
+            
+            <input type="text" id="animal-input" placeholder="bv. Olifant" class="w-full bg-green-900 border-2 border-green-600 p-4 rounded-lg text-white text-center text-xl mb-4 focus:outline-none focus:border-yellow-500 placeholder-green-700">
+            
+            <button onclick="submitAnimal()" class="btn-jungle w-full py-3 rounded-lg text-white font-bold text-lg">
+                <i class="fas fa-check mr-2"></i> START SPEL
+            </button>
+        </div>
+
+        <!-- Game Interface -->
+        <div id="screen-game" class="hidden card-jungle rounded-xl flex flex-col h-[600px] relative">
+            <!-- Header -->
+            <div class="bg-green-900/80 p-3 border-b border-green-700 flex justify-between items-center rounded-t-xl">
+                <div class="flex flex-col">
+                    <span class="text-xs text-green-400 uppercase tracking-wider">Rol</span>
+                    <span id="game-role-display" class="font-bold text-yellow-400 text-lg">...</span>
+                </div>
+                <div class="bg-red-900/50 px-3 py-1 rounded border border-red-800">
+                    <span class="text-xs text-red-300 block text-center">FOUTEN</span>
+                    <div id="wrong-guesses-dots" class="flex gap-1 justify-center mt-1">
+                        <i class="far fa-circle text-red-500"></i>
+                        <i class="far fa-circle text-red-500"></i>
+                        <i class="far fa-circle text-red-500"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat/Log Area -->
+            <div id="game-log" class="flex-1 overflow-y-auto p-4 space-y-4">
+                <!-- Messages injected here -->
+            </div>
+
+            <!-- Input Area (Dynamic based on role/turn) -->
+            <div id="action-area" class="p-4 bg-green-900/90 border-t border-green-700 rounded-b-xl">
+                <!-- Injected via JS -->
+            </div>
+        </div>
+
+        <!-- Game Over Modal -->
+        <div id="screen-result" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div class="card-jungle w-full max-w-sm p-8 text-center rounded-2xl border-4 border-yellow-500 transform scale-100 transition-transform">
+                <div id="result-icon" class="text-6xl mb-4">🏆</div>
+                <h2 id="result-title" class="text-4xl jungle-font text-white mb-2">GEWONNEN!</h2>
+                <p id="result-message" class="text-green-200 mb-6 text-lg">Het dier was: <span id="reveal-animal" class="font-bold text-yellow-400">...</span></p>
+                <button onclick="window.location.reload()" class="btn-jungle w-full py-3 rounded-lg text-white font-bold">
+                    <i class="fas fa-redo mr-2"></i> OPNIEUW SPELEN
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Firebase SDKs (COMPAT versions for direct browser use) -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        // --- 1. CONFIGURATION & SETUP ---
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'ra-ra-dier-game';
+        
+        // Jouw specifieke Firebase configuratie
+        const firebaseConfig = {
+            apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
+            authDomain: "manonopeenrij.firebaseapp.com",
+            projectId: "manonopeenrij",
+            storageBucket: "manonopeenrij.firebasestorage.app",
+            messagingSenderId: "575065794428",
+            appId: "1:575065794428:web:ec12bbc195263015f3e6f9",
+            measurementId: "G-FY36PXCZE6"
+        };
+        
+        // Initialize Firebase
+        const app = firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        // State
+        let currentUser = null;
+        let currentLobbyId = null;
+        let unsubscribeLobby = null;
+        let myRole = ''; // 'host' (Bedenker) or 'joiner' (Onderzoeker)
+
+        // DOM Elements
+        const screens = {
+            loading: document.getElementById('loading'),
+            home: document.getElementById('screen-home'),
+            lobby: document.getElementById('screen-lobby'),
+            setup: document.getElementById('screen-setup'),
+            game: document.getElementById('screen-game'),
+            result: document.getElementById('screen-result')
+        };
+
+        // --- 2. AUTHENTICATION ---
+        async function initAuth() {
+            // Probeer anoniem in te loggen op jouw project
+            try {
+                // Als we in de preview omgeving zitten, proberen we de omgevingstoken,
+                // maar als dat faalt (vanwege project mismatch), vallen we terug op anoniem.
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try {
+                         await auth.signInWithCustomToken(__initial_auth_token);
+                    } catch(e) {
+                        console.log("Token auth failed (expected if custom project), using anonymous.");
+                        await auth.signInAnonymously();
+                    }
+                } else {
+                    await auth.signInAnonymously();
+                }
+            } catch (error) {
+                console.error("Auth Error:", error);
+                document.getElementById('home-error').textContent = "Authenticatie fout. Check console.";
+                document.getElementById('home-error').classList.remove('hidden');
+            }
+        }
+
+        auth.onAuthStateChanged((user) => {
+            if (user) {
+                currentUser = user;
+                showScreen('home');
+            } else {
+                showScreen('loading');
+            }
+        });
+
+        initAuth();
+
+        // --- 3. UI HELPERS ---
+        function showScreen(screenName) {
+            Object.values(screens).forEach(el => el.classList.add('hidden'));
+            if(screens[screenName]) screens[screenName].classList.remove('hidden');
+        }
+
+        // --- 4. GAME LOGIC: CREATE & JOIN ---
+        
+        function generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for(let i=0; i<4; i++) code += chars.charAt(Math.floor(Math.random() * chars.length));
+            return code;
+        }
+
+        async function createGame() {
+            if (!currentUser) return;
+            const code = generateCode();
+            currentLobbyId = code;
+            myRole = 'host';
+
+            // Create Lobby in Firestore
+            try {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(code).set({
+                    hostId: currentUser.uid,
+                    joinerId: null,
+                    status: 'waiting', // waiting, setup, playing, finished
+                    animal: '',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    questions: [], // { text: "Is het groot?", answer: null | 'ja' | 'nee' | 'misschien' }
+                    wrongGuesses: 0,
+                    winner: null
+                });
+                
+                document.getElementById('lobby-display-code').textContent = code;
+                subscribeToLobby(code);
+            } catch (error) {
+                console.error("Error creating lobby:", error);
+                alert("Kon geen game aanmaken. Probeer het opnieuw. Check console voor permissies.");
+            }
+        }
+
+        async function joinGame() {
+            if (!currentUser) return;
+            const codeInput = document.getElementById('join-code').value.toUpperCase().trim();
+            if (codeInput.length !== 4) {
+                document.getElementById('home-error').textContent = "Code moet 4 tekens zijn.";
+                document.getElementById('home-error').classList.remove('hidden');
+                return;
+            }
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(codeInput);
+            
+            try {
+                const doc = await lobbyRef.get();
+                if (!doc.exists) {
+                    throw new Error("Game niet gevonden");
+                }
+                const data = doc.data();
+                if (data.status !== 'waiting' && data.joinerId !== currentUser.uid) {
+                    throw new Error("Game is al bezig of vol");
+                }
+
+                // Join logic
+                if (data.joinerId !== currentUser.uid) {
+                    await lobbyRef.update({
+                        joinerId: currentUser.uid,
+                        status: 'setup' // Move to setup as soon as joined
+                    });
+                }
+
+                currentLobbyId = codeInput;
+                myRole = 'joiner';
+                subscribeToLobby(codeInput);
+
+            } catch (error) {
+                document.getElementById('home-error').textContent = error.message;
+                document.getElementById('home-error').classList.remove('hidden');
+            }
+        }
+
+        function copyCode() {
+            const code = document.getElementById('lobby-display-code').textContent;
+            navigator.clipboard.writeText(code);
+            // Visual feedback
+            const btn = document.querySelector('#lobby-display-code + button');
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check text-green-400"></i>';
+            setTimeout(() => btn.innerHTML = originalIcon, 1500);
+        }
+
+        // --- 5. REAL-TIME GAME LOOP ---
+
+        function subscribeToLobby(lobbyId) {
+            if (unsubscribeLobby) unsubscribeLobby();
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(lobbyId);
+
+            unsubscribeLobby = lobbyRef.onSnapshot((doc) => {
+                if (!doc.exists) {
+                    alert("De game is beëindigd door de host.");
+                    window.location.reload();
+                    return;
+                }
+
+                const data = doc.data();
+                handleGameState(data);
+            }, (error) => {
+                console.error("Lobby sync error:", error);
+            });
+        }
+
+        function handleGameState(data) {
+            // 1. Waiting Room
+            if (data.status === 'waiting') {
+                showScreen('lobby');
+                const playerSlot = document.getElementById('player-slot');
+                if (data.joinerId) {
+                    // Start game transition is handled by update in joinGame or host trigger
+                    // But if we are here, usually just waiting
+                }
+            }
+            
+            // 2. Setup (Host chooses animal)
+            else if (data.status === 'setup') {
+                if (myRole === 'host') {
+                    showScreen('setup');
+                } else {
+                    // Joiner waits screen styled as lobby but with specific text
+                    showScreen('lobby');
+                    document.querySelector('#screen-lobby h2').textContent = "Bedenker kiest dier...";
+                    document.getElementById('player-slot').innerHTML = `
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-user text-white"></i></div>
+                            <span>Onderzoeker (Jij)</span>
+                        </div>
+                        <span class="text-green-400"><i class="fas fa-check"></i></span>
+                    `;
+                }
+            }
+
+            // 3. Playing
+            else if (data.status === 'playing') {
+                showScreen('game');
+                renderGameUI(data);
+            }
+
+            // 4. Finished
+            else if (data.status === 'finished') {
+                showScreen('result');
+                const iWon = (data.winner === myRole);
+                const title = document.getElementById('result-title');
+                const icon = document.getElementById('result-icon');
+                const msg = document.getElementById('result-message');
+                const animalReveal = document.getElementById('reveal-animal');
+
+                animalReveal.textContent = data.animal;
+
+                if (iWon) {
+                    title.textContent = "GEWONNEN!";
+                    title.className = "text-4xl jungle-font text-yellow-400 mb-2";
+                    icon.textContent = "🏆";
+                } else {
+                    title.textContent = "VERLOREN...";
+                    title.className = "text-4xl jungle-font text-red-400 mb-2";
+                    icon.textContent = "🦁";
+                }
+            }
+        }
+
+        // --- 6. GAME ACTIONS ---
+
+        async function submitAnimal() {
+            const animal = document.getElementById('animal-input').value.trim();
+            if (!animal) return;
+
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({
+                animal: animal,
+                status: 'playing'
+            });
+        }
+
+        // --- 7. RENDER GAME UI ---
+        function renderGameUI(data) {
+            // Update Header info
+            const roleDisplay = document.getElementById('game-role-display');
+            roleDisplay.textContent = myRole === 'host' ? "De Bedenker 🧠" : "De Onderzoeker 🔎";
+
+            // Update Lives (Wrong Guesses)
+            const dotsContainer = document.getElementById('wrong-guesses-dots');
+            let dotsHtml = '';
+            for(let i=0; i<3; i++) {
+                if (i < data.wrongGuesses) {
+                    dotsHtml += '<i class="fas fa-times-circle text-red-500"></i>';
+                } else {
+                    dotsHtml += '<i class="far fa-circle text-red-900/50"></i>';
+                }
+            }
+            dotsContainer.innerHTML = dotsHtml;
+
+            // Render Log
+            const log = document.getElementById('game-log');
+            log.innerHTML = '';
+
+            // Intro message
+            const introDiv = document.createElement('div');
+            introDiv.className = "text-center text-xs text-green-500 mb-4 uppercase tracking-widest";
+            introDiv.textContent = "- Spel gestart -";
+            log.appendChild(introDiv);
+
+            data.questions.forEach((q, index) => {
+                // Question Bubble
+                const qDiv = document.createElement('div');
+                qDiv.className = "flex justify-end mb-2";
+                qDiv.innerHTML = `
+                    <div class="chat-bubble bg-blue-900/80 text-blue-100 p-3 max-w-[85%] rounded-tr-none">
+                        <p class="text-sm font-bold text-blue-300 mb-1"><i class="fas fa-question-circle"></i> Onderzoeker</p>
+                        ${q.text}
+                    </div>
+                `;
+                log.appendChild(qDiv);
+
+                // Answer Bubble (if exists)
+                if (q.answer) {
+                    const aDiv = document.createElement('div');
+                    aDiv.className = "flex justify-start mb-4";
+                    let colorClass = "bg-green-800";
+                    if (q.answer === 'nee') colorClass = "bg-red-900/80";
+                    if (q.answer === 'misschien') colorClass = "bg-yellow-800/80";
+
+                    aDiv.innerHTML = `
+                        <div class="chat-bubble ${colorClass} text-white p-3 max-w-[85%] rounded-tl-none">
+                            <p class="text-sm font-bold text-green-300 mb-1"><i class="fas fa-lightbulb"></i> Bedenker</p>
+                            ${q.answer.toUpperCase()}
+                        </div>
+                    `;
+                    log.appendChild(aDiv);
+                } else {
+                    // Waiting indicator
+                    const waitDiv = document.createElement('div');
+                    waitDiv.className = "flex justify-start mb-4 opacity-50";
+                    waitDiv.innerHTML = `<span class="text-xs text-green-400 italic">Bedenker denkt na...</span>`;
+                    log.appendChild(waitDiv);
+                }
+            });
+
+            // Scroll to bottom
+            log.scrollTop = log.scrollHeight;
+
+            // Render Action Area
+            const actionArea = document.getElementById('action-area');
+            actionArea.innerHTML = '';
+
+            const lastQuestion = data.questions[data.questions.length - 1];
+            const waitingForAnswer = lastQuestion && !lastQuestion.answer;
+
+            if (myRole === 'host') {
+                // Host View
+                if (waitingForAnswer) {
+                    actionArea.innerHTML = `
+                        <p class="text-white mb-2 text-center text-sm">Beantwoord de vraag:</p>
+                        <p class="text-yellow-400 font-bold text-center mb-3">"${lastQuestion.text}"</p>
+                        <div class="grid grid-cols-3 gap-2">
+                            <button onclick="answerQuestion(${data.questions.length - 1}, 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
+                            <button onclick="answerQuestion(${data.questions.length - 1}, 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
+                            <button onclick="answerQuestion(${data.questions.length - 1}, 'misschien')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs">MISSCHIEN</button>
+                        </div>
+                    `;
+                } else {
+                    actionArea.innerHTML = `
+                        <div class="text-center text-green-400 py-2">
+                            <p class="animate-pulse">Wachten op de Onderzoeker...</p>
+                            <p class="text-xs text-green-600 mt-1">Het geheime dier is: <span class="text-green-300 font-bold">${data.animal}</span></p>
+                        </div>
+                    `;
+                }
+            } else {
+                // Joiner View
+                if (waitingForAnswer) {
+                    actionArea.innerHTML = `
+                        <div class="text-center text-green-400 py-4">
+                            <i class="fas fa-spinner fa-spin mr-2"></i> Wachten op antwoord...
+                        </div>
+                    `;
+                } else {
+                    actionArea.innerHTML = `
+                        <div class="flex flex-col gap-2">
+                            <div class="flex gap-2">
+                                <input type="text" id="question-input" placeholder="Stel een vraag (geen gok!)" class="flex-1 bg-green-950 border border-green-700 rounded px-3 py-2 text-white focus:outline-none focus:border-yellow-500">
+                                <button onclick="sendQuestion()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 rounded font-bold border-b-4 border-blue-800"><i class="fas fa-paper-plane"></i></button>
+                            </div>
+                            <div class="relative flex py-1 items-center">
+                                <div class="flex-grow border-t border-green-800"></div>
+                                <span class="flex-shrink mx-2 text-xs text-green-600">OF</span>
+                                <div class="flex-grow border-t border-green-800"></div>
+                            </div>
+                            <div class="flex gap-2">
+                                <input type="text" id="guess-input" placeholder="Raad het dier!" class="flex-1 bg-yellow-900/30 border border-yellow-700/50 rounded px-3 py-2 text-yellow-100 placeholder-yellow-700 focus:outline-none focus:border-yellow-500">
+                                <button onclick="sendGuess()" class="bg-yellow-600 hover:bg-yellow-500 text-white px-4 rounded font-bold border-b-4 border-yellow-800">RAAD!</button>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+        }
+
+        // --- 8. GAMEPLAY FUNCTIONS ---
+
+        async function sendQuestion() {
+            const input = document.getElementById('question-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
+            
+            // Get current questions first to append
+            const doc = await lobbyRef.get();
+            const currentQuestions = doc.data().questions || [];
+
+            await lobbyRef.update({
+                questions: [...currentQuestions, { text: text, answer: null, timestamp: Date.now() }]
+            });
+            input.value = '';
+        }
+
+        async function answerQuestion(index, answer) {
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
+            
+            const doc = await lobbyRef.get();
+            const questions = doc.data().questions;
+            
+            if (questions[index]) {
+                questions[index].answer = answer;
+                await lobbyRef.update({ questions: questions });
+            }
+        }
+
+        async function sendGuess() {
+            const input = document.getElementById('guess-input');
+            const guess = input.value.trim();
+            if (!guess) return;
+
+            if (!confirm(`Weet je zeker dat je "${guess}" wilt gokken? Dit kost een leven!`)) return;
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
+            const doc = await lobbyRef.get();
+            const data = doc.data();
+
+            // Check correctness (case insensitive)
+            if (guess.toLowerCase() === data.animal.toLowerCase()) {
+                // Correct!
+                await lobbyRef.update({
+                    status: 'finished',
+                    winner: 'onderzoeker'
+                });
+            } else {
+                // Wrong
+                const newWrongCount = (data.wrongGuesses || 0) + 1;
+                if (newWrongCount >= 3) {
+                    // Game Over, Host wins
+                    await lobbyRef.update({
+                        wrongGuesses: newWrongCount,
+                        status: 'finished',
+                        winner: 'bedenker'
+                    });
+                } else {
+                    // Just a wrong guess, add a system message to chat log basically? 
+                    // Or just update count. Let's add a "fake" question that is the guess for history.
+                    const questions = data.questions || [];
+                    questions.push({
+                        text: `Is het een ${guess}?`,
+                        answer: 'nee', // Auto answer no
+                        timestamp: Date.now()
+                    });
+
+                    await lobbyRef.update({
+                        wrongGuesses: newWrongCount,
+                        questions: questions
+                    });
+                }
+            }
+        }
+
+    </script>
+</body>
+</html>
