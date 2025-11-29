@@ -112,8 +112,11 @@
         <!-- Home Screen -->
         <div id="screen-home" class="hidden card-jungle rounded-xl p-8 text-center relative overflow-hidden">
             <h1 class="text-5xl text-yellow-400 mb-2 drop-shadow-md">RA RA<br><span class="text-green-400">RAAD HET DIER</span></h1>
-            <p class="text-green-200 mb-8 italic">Wie is de koning van de jungle?</p>
+            <p class="text-green-200 mb-6 italic">Wie is de koning van de jungle?</p>
             
+            <!-- Added Name Input -->
+            <input type="text" id="player-name" placeholder="Voer je naam in" maxlength="15" class="w-full bg-green-900 border-2 border-green-700 text-center text-white text-lg rounded-lg mb-4 p-3 focus:outline-none focus:border-yellow-500 placeholder-green-700">
+
             <div class="space-y-4">
                 <button onclick="createGame()" class="btn-jungle w-full py-4 rounded-lg text-white text-2xl font-bold tracking-wider hover:brightness-110">
                     <i class="fas fa-plus-circle mr-2"></i> NIEUW SPEL
@@ -152,13 +155,27 @@
                 <!-- Dynamically filled -->
             </div>
 
-            <p class="text-sm text-green-400 animate-pulse">Het spel start automatisch zodra iemand joint.</p>
+            <p class="text-sm text-green-400 animate-pulse" id="lobby-status-text">Wachten op de 3e speler...</p>
         </div>
 
-        <!-- Setup (Host only) -->
+        <!-- Role Selection (Host only) -->
+        <div id="screen-roleselect" class="hidden card-jungle rounded-xl p-6 text-center">
+            <h2 class="text-2xl text-yellow-400 mb-4 jungle-font">KIES DE BEDENKER</h2>
+            <p class="text-green-200 mb-4">Selecteer wie het dier bedenkt. De andere 2 worden Onderzoekers.</p>
+            
+            <div id="role-selection-options" class="space-y-3 mb-6">
+                <!-- Radio buttons injected here -->
+            </div>
+            
+            <button onclick="finalizeRoles()" id="finalize-roles-btn" class="btn-jungle w-full py-3 rounded-lg text-white font-bold text-lg">
+                <i class="fas fa-check mr-2"></i> BEVESTIG ROL
+            </button>
+        </div>
+
+        <!-- Setup (Bedenker only) -->
         <div id="screen-setup" class="hidden card-jungle rounded-xl p-6 text-center">
             <h2 class="text-2xl text-yellow-400 mb-4 jungle-font">KIES JE DIER!</h2>
-            <p class="text-green-200 mb-4">Jij bent de Bedenker. Welk dier moet de ander raden?</p>
+            <p class="text-green-200 mb-4" id="setup-instruction">Jij bent de Bedenker. Welk dier moeten de Onderzoekers raden?</p>
             
             <input type="text" id="animal-input" placeholder="bv. Olifant" class="w-full bg-green-900 border-2 border-green-600 p-4 rounded-lg text-white text-center text-xl mb-4 focus:outline-none focus:border-yellow-500 placeholder-green-700">
             
@@ -172,8 +189,11 @@
             <!-- Header -->
             <div class="bg-green-900/80 p-3 border-b border-green-700 flex justify-between items-center rounded-t-xl">
                 <div class="flex flex-col">
-                    <span class="text-xs text-green-400 uppercase tracking-wider">Rol</span>
+                    <span class="text-xs text-green-400 uppercase tracking-wider">Mijn Rol</span>
                     <span id="game-role-display" class="font-bold text-yellow-400 text-lg">...</span>
+                </div>
+                <div id="turn-indicator" class="bg-blue-900/50 px-3 py-1 rounded border border-blue-800 text-sm text-blue-300 font-bold text-center">
+                    BEURT: ...
                 </div>
                 <div class="bg-red-900/50 px-3 py-1 rounded border border-red-800">
                     <span class="text-xs text-red-300 block text-center">FOUTEN</span>
@@ -200,7 +220,7 @@
         <div id="screen-result" class="hidden absolute inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
             <div class="card-jungle w-full max-w-sm p-8 text-center rounded-2xl border-4 border-yellow-500 transform scale-100 transition-transform">
                 <div id="result-icon" class="text-6xl mb-4">🏆</div>
-                <h2 id="result-title" class="text-4xl jungle-font text-white mb-2">GEWONNEN!</h2>
+                <h2 id="result-title" class="4xl jungle-font text-white mb-2">GEWONNEN!</h2>
                 
                 <!-- Added reason text -->
                 <p id="result-reason" class="text-white text-md font-bold mb-4 bg-green-900/50 p-2 rounded">...</p>
@@ -258,14 +278,17 @@
         let currentUser = null;
         let currentLobbyId = null;
         let unsubscribeLobby = null;
-        let myRole = ''; // 'host' (Bedenker) or 'joiner' (Onderzoeker)
+        let myRole = ''; // 'host' (Lobby maker) or 'joiner'
+        let myGameRole = ''; // 'bedenker' or 'onderzoeker'
         let factInterval = null;
+        let playersMap = {}; // UID -> { name, role }
 
         // DOM Elements
         const screens = {
             loading: document.getElementById('loading'),
             home: document.getElementById('screen-home'),
             lobby: document.getElementById('screen-lobby'),
+            roleselect: document.getElementById('screen-roleselect'), // New screen
             setup: document.getElementById('screen-setup'),
             game: document.getElementById('screen-game'),
             result: document.getElementById('screen-result')
@@ -295,7 +318,7 @@
             if (user) {
                 currentUser = user;
                 showScreen('home');
-                startLionFacts(); // Start facts globally when logged in (or move to playing state if preferred)
+                startLionFacts();
             } else {
                 showScreen('loading');
             }
@@ -318,35 +341,57 @@
             return code;
         }
 
+        function getPlayerName() {
+            const nameInput = document.getElementById('player-name').value.trim();
+            if (!nameInput) {
+                document.getElementById('home-error').textContent = "Voer eerst je naam in.";
+                document.getElementById('home-error').classList.remove('hidden');
+                return null;
+            }
+            // Simple validation/sanitization
+            return nameInput.substring(0, 15);
+        }
+
         async function createGame() {
             if (!currentUser) return;
+            const name = getPlayerName();
+            if (!name) return;
+
             const code = generateCode();
             currentLobbyId = code;
             myRole = 'host';
 
             try {
+                // Initialize lobby with host details
+                const initialPlayers = {};
+                initialPlayers[currentUser.uid] = { name: name, role: 'host' }; 
+
                 await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(code).set({
                     hostId: currentUser.uid,
-                    joinerId: null,
-                    status: 'waiting', 
+                    status: 'waiting', // waiting, full, roleselect, setup, playing, finished
+                    players: initialPlayers, // { uid: { name, role } }
+                    bedenkerId: null,
+                    onderzoekers: [],
+                    currentTurn: null, // UID of the onderzoeker who is currently allowed to ask
                     animal: '',
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                     questions: [],
                     wrongGuesses: 0,
                     winner: null
                 });
                 
-                // Set code locally immediately
                 document.getElementById('lobby-display-code').textContent = code;
                 subscribeToLobby(code);
             } catch (error) {
                 console.error("Error creating lobby:", error);
-                alert("Kon geen game aanmaken. Probeer het opnieuw.");
+                alert("Kon geen game aanmaken. Probeer het opnieuw. Check console voor permissies.");
             }
         }
 
         async function joinGame() {
             if (!currentUser) return;
+            const name = getPlayerName();
+            if (!name) return;
+
             const codeInput = document.getElementById('join-code').value.toUpperCase().trim();
             if (codeInput.length !== 4) {
                 document.getElementById('home-error').textContent = "Code moet 4 tekens zijn.";
@@ -362,24 +407,50 @@
                     throw new Error("Game niet gevonden");
                 }
                 const data = doc.data();
-                if (data.status !== 'waiting' && data.joinerId !== currentUser.uid) {
-                    throw new Error("Game is al bezig of vol");
-                }
+                
+                // Max 3 players (1 host + 2 joiners)
+                const playerCount = Object.keys(data.players || {}).length;
 
-                if (data.joinerId !== currentUser.uid) {
-                    await lobbyRef.update({
-                        joinerId: currentUser.uid,
-                        status: 'setup'
-                    });
+                if (playerCount >= 3 && !data.players.hasOwnProperty(currentUser.uid)) {
+                     throw new Error("Game is vol (3/3 spelers).");
+                }
+                
+                if (data.status !== 'waiting' && !data.players.hasOwnProperty(currentUser.uid)) {
+                     throw new Error("Spel is al bezig.");
                 }
 
                 currentLobbyId = codeInput;
-                myRole = 'joiner';
-                // Set code locally immediately for joiner
+                myRole = data.players.hasOwnProperty(currentUser.uid) ? data.players[currentUser.uid].role : 'joiner';
+
+                if (!data.players.hasOwnProperty(currentUser.uid)) {
+                    // New player joining
+                    const newPlayers = { ...data.players };
+                    newPlayers[currentUser.uid] = { name: name, role: 'joiner' };
+                    
+                    let newStatus = 'waiting';
+                    if (playerCount === 2) {
+                        newStatus = 'roleselect'; // Max players reached, move to roleselect
+                    }
+                    
+                    await lobbyRef.update({
+                        players: newPlayers,
+                        status: newStatus
+                    });
+                } else {
+                    // Rejoining player
+                    if (data.status === 'roleselect' || data.status === 'setup' || data.status === 'playing' || data.status === 'finished') {
+                        // The user is rejoining an active/full lobby, just subscribe and let handleGameState fix the screen.
+                    } else if (playerCount === 3) {
+                         // Should instantly push to roleselect if the host hasn't done it yet
+                        await lobbyRef.update({ status: 'roleselect' });
+                    }
+                }
+                
                 document.getElementById('lobby-display-code').textContent = codeInput;
                 subscribeToLobby(codeInput);
 
             } catch (error) {
+                console.error("Join error:", error);
                 document.getElementById('home-error').textContent = error.message;
                 document.getElementById('home-error').classList.remove('hidden');
             }
@@ -409,6 +480,7 @@
                 }
 
                 const data = doc.data();
+                playersMap = data.players || {};
                 handleGameState(data);
             }, (error) => {
                 console.error("Lobby sync error:", error);
@@ -421,130 +493,145 @@
                 document.getElementById('lobby-display-code').textContent = currentLobbyId;
             }
 
-            // 1. Waiting Room or Setup Phase
-            if (data.status === 'waiting' || data.status === 'setup') {
-                if (data.status === 'waiting') showScreen('lobby');
-                
-                const playerList = document.getElementById('lobby-players');
-                let hostText = myRole === 'host' ? "Bedenker (Jij)" : "Bedenker";
-                let joinerText = myRole === 'joiner' ? "Onderzoeker (Jij)" : "Onderzoeker";
-                
-                let joinerStatusHtml = '';
-                if (data.joinerId) {
-                    joinerStatusHtml = `
-                        <div class="flex items-center justify-between bg-green-800 p-3 rounded">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
-                                <span>${joinerText}</span>
-                            </div>
-                            <span class="text-green-400"><i class="fas fa-check"></i></span>
-                        </div>`;
-                } else {
-                    joinerStatusHtml = `
-                        <div class="flex items-center justify-between bg-green-800 p-3 rounded opacity-50">
-                            <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center"><i class="fas fa-search text-white"></i></div>
-                                <span>Wachten op Onderzoeker...</span>
-                            </div>
-                            <span class="animate-pulse">...</span>
-                        </div>`;
-                }
+            // Determine my role based on bedenkerId
+            myGameRole = data.bedenkerId === currentUser.uid ? 'bedenker' : (data.bedenkerId ? 'onderzoeker' : '');
+            
+            const playerCount = Object.keys(data.players || {}).length;
 
-                playerList.innerHTML = `
+            // --- RENDER LOBBY LIST (Used in waiting/roleselect/setup screens) ---
+            const playerList = document.getElementById('lobby-players');
+            playerList.innerHTML = '';
+            
+            const playerUids = Object.keys(data.players || {});
+            
+            playerUids.forEach((uid, index) => {
+                const player = data.players[uid];
+                const isMe = uid === currentUser.uid;
+                const playerGameRole = data.bedenkerId === uid ? 'Bedenker' : (data.bedenkerId && data.onderzoekers.includes(uid) ? 'Onderzoeker' : 'Wachtend');
+                const isPlayerReady = data.bedenkerId || playerCount < 3;
+                
+                let iconClass = 'fa-user';
+                let roleColor = 'text-white';
+                if (playerGameRole === 'Bedenker') { iconClass = 'fa-crown'; roleColor = 'text-yellow-400'; }
+                if (playerGameRole === 'Onderzoeker') { iconClass = 'fa-search'; roleColor = 'text-blue-400'; }
+
+                const playerHtml = `
                     <div class="flex items-center justify-between bg-green-800 p-3 rounded">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-yellow-600 flex items-center justify-center"><i class="fas fa-crown text-white"></i></div>
-                            <span class="font-bold">${hostText}</span>
+                            <div class="w-8 h-8 rounded-full ${playerGameRole === 'Bedenker' ? 'bg-yellow-600' : (playerGameRole === 'Onderzoeker' ? 'bg-blue-600' : 'bg-gray-600')} flex items-center justify-center"><i class="fas ${iconClass} text-white"></i></div>
+                            <span class="font-bold">${player.name} ${isMe ? '(Jij)' : ''}</span>
                         </div>
-                        <span class="text-green-400"><i class="fas fa-check"></i></span>
+                        <span class="text-green-400">${isPlayerReady ? `<span class="${roleColor}">${playerGameRole}</span> <i class="fas fa-check"></i>` : (index === 0 ? '<span class="text-green-400">Host</span>' : 'Wachtend')}</span>
                     </div>
-                    ${joinerStatusHtml}
                 `;
-            }
+                playerList.innerHTML += playerHtml;
+            });
             
-            // 2. Setup Specifics
-            if (data.status === 'setup') {
+            // Fill remaining slots
+            for(let i=playerCount; i<3; i++) {
+                 playerList.innerHTML += `
+                    <div class="flex items-center justify-between bg-green-800 p-3 rounded opacity-50">
+                        <div class="flex items-center gap-3">
+                            <div class="w-8 h-8 rounded-full bg-gray-600 flex items-center justify-center"><i class="fas fa-user-plus text-white"></i></div>
+                            <span>Slot ${i + 1}: Wachten op speler...</span>
+                        </div>
+                        <span class="animate-pulse">...</span>
+                    </div>
+                 `;
+            }
+
+            // --- SCREEN FLOW LOGIC ---
+
+            if (data.status === 'waiting') {
+                showScreen('lobby');
+                document.getElementById('lobby-status-text').textContent = `Wachten op de ${3 - playerCount}e speler... (3 spelers nodig)`;
+            } else if (data.status === 'roleselect') {
                 if (myRole === 'host') {
+                    renderRoleSelection(data.players);
+                    showScreen('roleselect');
+                } else {
+                    showScreen('lobby');
+                    document.getElementById('lobby-status-text').textContent = `De Host kiest nu de Bedenker...`;
+                }
+            } else if (data.status === 'setup') {
+                if (myGameRole === 'bedenker') {
+                    document.getElementById('setup-instruction').textContent = `Jij, ${playersMap[currentUser.uid].name}, bent de Bedenker. Welk dier moeten de Onderzoekers raden?`;
                     showScreen('setup');
                 } else {
                     showScreen('lobby');
-                    document.querySelector('#screen-lobby h2').textContent = "Bedenker kiest dier...";
+                    document.getElementById('lobby-status-text').textContent = `${playersMap[data.bedenkerId].name} kiest het dier...`;
                 }
-            }
-
-            // 3. Playing
-            else if (data.status === 'playing') {
+            } else if (data.status === 'playing') {
                 showScreen('game');
                 renderGameUI(data);
-            }
-
-            // 4. Finished
-            else if (data.status === 'finished') {
+            } else if (data.status === 'finished') {
                 showScreen('result');
-                clearInterval(factInterval); // Stop facts when game over
-
-                // WINNER LOGIC
-                let iWon = false;
-                let reasonText = "";
-
-                if (myRole === 'host') {
-                    // I am Bedenker
-                    if (data.winner === 'bedenker') {
-                        iWon = true;
-                        reasonText = "De Onderzoeker heeft al zijn levens verloren! ☠️";
-                    } else {
-                        iWon = false;
-                        reasonText = "De Onderzoeker heeft jouw dier geraden! 🧠";
-                    }
-                } else {
-                    // I am Joiner/Onderzoeker
-                    if (data.winner === 'onderzoeker') {
-                        iWon = true;
-                        reasonText = "Je hebt het dier goed geraden! 🎉";
-                    } else {
-                        iWon = false;
-                        reasonText = "Je hebt 3 keer verkeerd gegokt... 🥀";
-                    }
-                }
-
-                const title = document.getElementById('result-title');
-                const icon = document.getElementById('result-icon');
-                const reasonEl = document.getElementById('result-reason');
-                const animalReveal = document.getElementById('reveal-animal');
-
-                animalReveal.textContent = data.animal;
-                reasonEl.textContent = reasonText;
-
-                if (iWon) {
-                    title.textContent = "GEWONNEN!";
-                    title.className = "text-4xl jungle-font text-yellow-400 mb-2";
-                    icon.textContent = "🏆";
-                } else {
-                    title.textContent = "VERLOREN...";
-                    title.className = "text-4xl jungle-font text-red-400 mb-2";
-                    icon.textContent = "🦁";
-                }
+                renderResultScreen(data);
             }
         }
 
-        // --- 6. GAME ACTIONS ---
+        // --- ROLE SELECTION LOGIC (HOST ONLY) ---
 
-        async function submitAnimal() {
-            const animal = document.getElementById('animal-input').value.trim();
-            if (!animal) return;
+        function renderRoleSelection(players) {
+            const optionsDiv = document.getElementById('role-selection-options');
+            optionsDiv.innerHTML = '';
 
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({
-                animal: animal,
-                status: 'playing'
+            Object.keys(players).forEach(uid => {
+                const player = players[uid];
+                const isMe = uid === currentUser.uid;
+                
+                const optionHtml = `
+                    <label class="flex items-center bg-green-900/50 p-3 rounded-lg cursor-pointer hover:bg-green-800 transition">
+                        <input type="radio" name="bedenker-choice" value="${uid}" class="form-radio h-5 w-5 text-yellow-500 bg-green-900 border-green-700 focus:ring-yellow-500">
+                        <span class="ml-3 font-bold text-white text-lg">${player.name} ${isMe ? '(Jij)' : ''}</span>
+                    </label>
+                `;
+                optionsDiv.innerHTML += optionHtml;
             });
         }
 
+        async function finalizeRoles() {
+            const selectedBedenker = document.querySelector('input[name="bedenker-choice"]:checked');
+            if (!selectedBedenker) {
+                alert("Kies alstublieft één Bedenker.");
+                return;
+            }
+
+            const bedenkerId = selectedBedenker.value;
+            const onderzoekers = Object.keys(playersMap).filter(uid => uid !== bedenkerId);
+            
+            if (onderzoekers.length !== 2) {
+                 console.error("Fout: Kon de onderzoekers niet correct bepalen.");
+                 return;
+            }
+
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({
+                bedenkerId: bedenkerId,
+                onderzoekers: onderzoekers,
+                currentTurn: onderzoekers[0], // Start with the first onderzoeker
+                status: 'setup'
+            });
+        }
+        
         // --- 7. RENDER GAME UI ---
         function renderGameUI(data) {
             // Update Header info
-            const roleDisplay = document.getElementById('game-role-display');
-            roleDisplay.textContent = myRole === 'host' ? "De Bedenker 🧠" : "De Onderzoeker 🔎";
+            const bedenkerName = playersMap[data.bedenkerId].name;
+            document.getElementById('game-role-display').textContent = myGameRole === 'bedenker' ? `De Bedenker (Jij)` : `De Onderzoeker`;
 
+            // Update Turn Indicator
+            const turnIndicator = document.getElementById('turn-indicator');
+            if (data.currentTurn) {
+                 const turnPlayerName = playersMap[data.currentTurn].name;
+                 turnIndicator.textContent = data.currentTurn === currentUser.uid ? "JOUW BEURT" : `BEURT: ${turnPlayerName}`;
+                 turnIndicator.className = data.currentTurn === currentUser.uid ? 
+                    "bg-yellow-600/90 px-3 py-1 rounded border border-yellow-800 text-sm text-white font-bold text-center" :
+                    "bg-blue-900/50 px-3 py-1 rounded border border-blue-800 text-sm text-blue-300 font-bold text-center";
+            } else {
+                 turnIndicator.textContent = "Wacht...";
+                 turnIndicator.className = "bg-blue-900/50 px-3 py-1 rounded border border-blue-800 text-sm text-blue-300 font-bold text-center";
+            }
+            
             // Update Lives (Wrong Guesses)
             const dotsContainer = document.getElementById('wrong-guesses-dots');
             let dotsHtml = '';
@@ -561,19 +648,21 @@
             const log = document.getElementById('game-log');
             log.innerHTML = '';
 
-            // Intro message
             const introDiv = document.createElement('div');
             introDiv.className = "text-center text-xs text-green-500 mb-4 uppercase tracking-widest";
-            introDiv.textContent = "- Spel gestart -";
+            introDiv.textContent = `- Spel gestart met ${bedenkerName} als Bedenker -`;
             log.appendChild(introDiv);
 
-            data.questions.forEach((q, index) => {
-                // Question Bubble
+            data.questions.forEach((q) => {
+                const isQuestion = q.type === 'question' || q.type === undefined;
+                const author = playersMap[q.authorId]?.name || 'Onbekend';
+                
+                // Question Bubble (or Guess)
                 const qDiv = document.createElement('div');
                 qDiv.className = "flex justify-end mb-2";
                 qDiv.innerHTML = `
                     <div class="chat-bubble bg-blue-900/80 text-blue-100 p-3 max-w-[85%] rounded-tr-none">
-                        <p class="text-sm font-bold text-blue-300 mb-1"><i class="fas fa-question-circle"></i> Onderzoeker</p>
+                        <p class="text-sm font-bold text-blue-300 mb-1"><i class="fas fa-question-circle"></i> ${author}</p>
                         ${q.text}
                     </div>
                 `;
@@ -587,24 +676,23 @@
                     let displayAnswer = q.answer.toUpperCase();
                     
                     if (q.answer === 'nee') colorClass = "bg-red-900/80";
-                    // Change visual for Weet ik niet
                     if (q.answer === 'weet ik niet') {
                         colorClass = "bg-yellow-800/80";
-                        displayAnswer = "WEET IK NIET"; // Double check display
+                        displayAnswer = "WEET IK NIET";
                     }
 
                     aDiv.innerHTML = `
                         <div class="chat-bubble ${colorClass} text-white p-3 max-w-[85%] rounded-tl-none">
-                            <p class="text-sm font-bold text-green-300 mb-1"><i class="fas fa-lightbulb"></i> Bedenker</p>
+                            <p class="text-sm font-bold text-green-300 mb-1"><i class="fas fa-lightbulb"></i> ${bedenkerName} (Bedenker)</p>
                             ${displayAnswer}
                         </div>
                     `;
                     log.appendChild(aDiv);
-                } else {
+                } else if (isQuestion) {
                     // Waiting indicator
                     const waitDiv = document.createElement('div');
                     waitDiv.className = "flex justify-start mb-4 opacity-50";
-                    waitDiv.innerHTML = `<span class="text-xs text-green-400 italic">Bedenker denkt na...</span>`;
+                    waitDiv.innerHTML = `<span class="text-xs text-green-400 italic">${bedenkerName} (Bedenker) denkt na...</span>`;
                     log.appendChild(waitDiv);
                 }
             });
@@ -616,36 +704,43 @@
             const actionArea = document.getElementById('action-area');
             actionArea.innerHTML = '';
 
-            const lastQuestion = data.questions[data.questions.length - 1];
+            const lastQuestion = data.questions.slice().reverse().find(q => q.type === 'question' || q.type === undefined);
             const waitingForAnswer = lastQuestion && !lastQuestion.answer;
 
-            if (myRole === 'host') {
-                // Host View
+            if (myGameRole === 'bedenker') {
+                // Bedenker View (Answers questions)
                 if (waitingForAnswer) {
                     actionArea.innerHTML = `
-                        <p class="text-white mb-2 text-center text-sm">Beantwoord de vraag:</p>
+                        <p class="text-white mb-2 text-center text-sm">Beantwoord de vraag van ${playersMap[lastQuestion.authorId].name}:</p>
                         <p class="text-yellow-400 font-bold text-center mb-3">"${lastQuestion.text}"</p>
                         <div class="grid grid-cols-3 gap-2">
-                            <button onclick="answerQuestion(${data.questions.length - 1}, 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
-                            <button onclick="answerQuestion(${data.questions.length - 1}, 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
-                            <!-- Changed button text and value -->
-                            <button onclick="answerQuestion(${data.questions.length - 1}, 'weet ik niet')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs leading-tight">WEET IK<br>NIET</button>
+                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'ja')" class="bg-green-600 hover:bg-green-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-green-800">JA</button>
+                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'nee')" class="bg-red-600 hover:bg-red-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-red-800">NEE</button>
+                            <button onclick="answerQuestion(data.questions.indexOf(lastQuestion), 'weet ik niet')" class="bg-yellow-600 hover:bg-yellow-500 text-white py-3 rounded font-bold shadow-lg border-b-4 border-yellow-800 text-xs leading-tight">WEET IK<br>NIET</button>
                         </div>
                     `;
                 } else {
                     actionArea.innerHTML = `
                         <div class="text-center text-green-400 py-2">
-                            <p class="animate-pulse">Wachten op de Onderzoeker...</p>
+                            <p class="animate-pulse">Wachten op de Onderzoekers...</p>
                             <p class="text-xs text-green-600 mt-1">Het geheime dier is: <span class="text-green-300 font-bold">${data.animal}</span></p>
                         </div>
                     `;
                 }
-            } else {
-                // Joiner View
+            } else if (myGameRole === 'onderzoeker') {
+                // Onderzoeker View (Asks questions/Guesses)
+                const isMyTurn = data.currentTurn === currentUser.uid;
+
                 if (waitingForAnswer) {
                     actionArea.innerHTML = `
                         <div class="text-center text-green-400 py-4">
-                            <i class="fas fa-spinner fa-spin mr-2"></i> Wachten op antwoord...
+                            <i class="fas fa-spinner fa-spin mr-2"></i> Wachten op antwoord van de Bedenker...
+                        </div>
+                    `;
+                } else if (!isMyTurn) {
+                    actionArea.innerHTML = `
+                        <div class="text-center text-green-400 py-4">
+                            Wachten op beurt van ${playersMap[data.currentTurn]?.name || 'andere Onderzoeker'}...
                         </div>
                     `;
                 } else {
@@ -667,10 +762,34 @@
                         </div>
                     `;
                 }
+            } else {
+                 actionArea.innerHTML = `
+                    <div class="text-center text-green-400 py-2">
+                        Wachten op start spel...
+                    </div>
+                `;
             }
         }
 
+        function renderResultScreen(data) {
+            // Already handled in handleGameState for clarity
+        }
+
         // --- 8. GAMEPLAY FUNCTIONS ---
+
+        async function submitAnimal() {
+            const animal = document.getElementById('animal-input').value.trim();
+            if (!animal) return;
+            
+            // Set the first Onderzoeker's turn
+            const onderzoekerTurn = data.onderzoekers[0];
+
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({
+                animal: animal,
+                status: 'playing',
+                currentTurn: onderzoekerTurn // Set turn to first seeker
+            });
+        }
 
         async function sendQuestion() {
             const input = document.getElementById('question-input');
@@ -683,7 +802,13 @@
             const currentQuestions = doc.data().questions || [];
 
             await lobbyRef.update({
-                questions: [...currentQuestions, { text: text, answer: null, timestamp: Date.now() }]
+                questions: [...currentQuestions, { 
+                    text: text, 
+                    answer: null, 
+                    authorId: currentUser.uid, // Add author ID
+                    type: 'question',
+                    timestamp: Date.now() 
+                }]
             });
             input.value = '';
         }
@@ -692,11 +817,22 @@
             const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
             
             const doc = await lobbyRef.get();
-            const questions = doc.data().questions;
+            const data = doc.data();
+            const questions = data.questions;
             
             if (questions[index]) {
                 questions[index].answer = answer;
-                await lobbyRef.update({ questions: questions });
+                
+                // Determine next onderzoeker's turn
+                const onderzoekers = data.onderzoekers;
+                const currentSeekerIndex = onderzoekers.indexOf(questions[index].authorId);
+                const nextSeekerIndex = (currentSeekerIndex + 1) % onderzoekers.length;
+                const nextSeekerId = onderzoekers[nextSeekerIndex];
+
+                await lobbyRef.update({ 
+                    questions: questions,
+                    currentTurn: nextSeekerId // Move turn to the other seeker
+                });
             }
         }
 
@@ -718,6 +854,13 @@
                 });
             } else {
                 const newWrongCount = (data.wrongGuesses || 0) + 1;
+                
+                // Determine next onderzoeker's turn (same logic as answering, turn switches)
+                const onderzoekers = data.onderzoekers;
+                const currentSeekerIndex = onderzoekers.indexOf(currentUser.uid);
+                const nextSeekerIndex = (currentSeekerIndex + 1) % onderzoekers.length;
+                const nextSeekerId = onderzoekers[nextSeekerIndex];
+
                 if (newWrongCount >= 3) {
                     await lobbyRef.update({
                         wrongGuesses: newWrongCount,
@@ -727,14 +870,17 @@
                 } else {
                     const questions = data.questions || [];
                     questions.push({
-                        text: `Is het een ${guess}?`,
+                        text: `Gok: Is het een ${guess}?`,
                         answer: 'nee', 
+                        authorId: currentUser.uid,
+                        type: 'guess-fail', // Mark as failed guess for tracking
                         timestamp: Date.now()
                     });
 
                     await lobbyRef.update({
                         wrongGuesses: newWrongCount,
-                        questions: questions
+                        questions: questions,
+                        currentTurn: nextSeekerId // Move turn after wrong guess
                     });
                 }
             }
