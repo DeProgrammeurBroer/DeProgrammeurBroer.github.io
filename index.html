@@ -825,6 +825,7 @@
             cheeseGameActive = false;
             if(cheeseGameLoop) clearInterval(cheeseGameLoop);
             if(cheeseSpawnInterval) clearInterval(cheeseSpawnInterval);
+            document.body.classList.remove('shake-soft', 'shake-hard'); // Force stop shake
             document.getElementById('cheese-game-over').classList.add('hidden');
             showScreen('lobby');
         }
@@ -871,12 +872,14 @@
             if(id === 5) { // Nuke
                 cheeseFlies.forEach(f => killFly(f.id));
                 shakeScreen(true);
+                setTimeout(() => document.body.classList.remove('shake-hard'), 500); // Temp shake for nuke
             }
         }
 
         function spawnFly() {
             if(!cheeseGameActive) return;
-            
+            if(cheeseFlies.length >= 10) return; // Cap active flies to prevent lag
+
             // Spawn at edge
             const side = Math.floor(Math.random() * 4); // 0:top, 1:right, 2:bottom, 3:left
             let x, y;
@@ -906,9 +909,9 @@
                 speed: 1 + (cheeseScore / 500) // Gets harder
             });
             
-            // Difficulty ramp up
+            // Difficulty ramp up - much slower curve
             if(cheeseScore > 100) clearInterval(cheeseSpawnInterval);
-            cheeseSpawnInterval = setInterval(spawnFly, Math.max(500, 2000 - (cheeseScore * 2)));
+            cheeseSpawnInterval = setInterval(spawnFly, Math.max(800, 2000 - (cheeseScore * 0.5)));
         }
 
         function updateCheeseGame() {
@@ -964,6 +967,7 @@
             cheeseLives--;
             sfx.damage();
             shakeScreen(true);
+            setTimeout(() => document.body.classList.remove('shake-hard'), 500); // Remove shake after hit
             updateCheeseUI();
             updateCheeseVisuals();
 
