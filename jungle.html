@@ -780,11 +780,26 @@
         async function submitAnimal() {
             const animal = document.getElementById('animal-input').value.trim();
             if (!animal) return;
+
+            const lobbyRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId);
+            const doc = await lobbyRef.get();
+            if (!doc.exists) {
+                console.error("Lobby not found during submitAnimal");
+                return;
+            }
+            const data = doc.data();
+
+            // Check if Onderzoekers are properly set up
+            if (!data.onderzoekers || data.onderzoekers.length === 0) {
+                 console.error("Geen Onderzoekers gevonden in lobby data.");
+                 alert("Fout: Geen Onderzoekers gevonden. Wacht op meer spelers.");
+                 return;
+            }
             
             // Set the first Onderzoeker's turn
             const onderzoekerTurn = data.onderzoekers[0];
 
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('lobbies').doc(currentLobbyId).update({
+            await lobbyRef.update({
                 animal: animal,
                 status: 'playing',
                 currentTurn: onderzoekerTurn // Set turn to first seeker
