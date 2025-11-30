@@ -144,14 +144,14 @@
             display: none;
             flex-direction: column;
             justify-content: flex-end; /* Barman staat onderaan */
-            align-items: center; /* AANGEPAST: Lijn horizontaal in het midden uit */
+            align-items: center; /* Lijn horizontaal in het midden uit */
             padding-bottom: 0; 
-            padding-right: 0; /* AANGEPAST: Geen padding rechts */
+            padding-right: 0; 
             z-index: 110; 
         }
 
         .barman-cutout {
-            width: 400px; /* AANGEPAST: Maak de barman groter */
+            width: 400px; /* Maak de barman groter */
             height: auto;
             position: relative;
             margin-bottom: 0;
@@ -172,18 +172,18 @@
             position: relative;
             max-width: 400px;
             min-width: 300px;
-            margin-bottom: -10px; 
+            margin-bottom: 50px; /* AANGEPAST: Geef de wolk meer ruimte vanaf de onderkant */
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             text-align: left;
             border: 2px solid #5d4037;
-            align-self: center; /* AANGEPAST: Centreer de wolk boven de barman */
+            align-self: center; /* Centreer de wolk boven de barman */
         }
 
         .speech-bubble::after {
             content: '';
             position: absolute;
             bottom: -20px;
-            left: 50%; /* AANGEPAST: Centreer de pijl onder de wolk */
+            left: 50%; /* Centreer de pijl onder de wolk */
             width: 0;
             height: 0;
             border: 10px solid transparent;
@@ -566,7 +566,7 @@
             if(currentGameId) {
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', currentGameId));
-                } catch(e) { console.log("Game al weg of error", e); }
+                } catch(e) { console.log("Game al weg of error", e); e.printStackTrace(); }
             }
             closeGameModal();
         };
