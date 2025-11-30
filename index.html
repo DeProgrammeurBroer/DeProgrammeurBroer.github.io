@@ -158,8 +158,8 @@
         .barman-cutout img {
             width: 100%;
             object-fit: contain;
-            /* Placeholder URL voor een barman */
-            content: url('https://placehold.co/300x500/2c1810/f4e4bc?text=Barman');
+            /* Gebruik barman.png als lokale cutout (NIEUW) */
+            content: url('barman.png'); 
         }
 
         .speech-bubble {
@@ -794,6 +794,224 @@
         function escape(s) {
             return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
+    </script>
+    
+    <!-- EXTRA SCRIPT VOOR GAME LOGIC MET GETDOC (Import fix) -->
+    <script type="module">
+        import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
+        import { getAuth } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'; // <-- TOEGEVOEGD
+        
+        const firebaseConfig = {
+            apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
+            authDomain: "manonopeenrij.firebaseapp.com",
+            projectId: "manonopeenrij",
+            storageBucket: "manonopeenrij.firebasestorage.app",
+            messagingSenderId: "575065794428",
+            appId: "1:575065794428:web:78a68f77a426f7daf3e6f9",
+            measurementId: "G-ERGHXY3LR7"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        
+        const auth = getAuth(app); // <-- TOEGEVOEGD
+        
+        // Pesten helper om kaart te verwijderen
+        function removeCard(hand, cardToRemove) {
+            const index = hand.indexOf(cardToRemove);
+            if (index > -1) {
+                hand.splice(index, 1);
+                return true;
+            }
+            return false;
+        }
+
+        // TTT LOGIC
+        window.tttMove = async (id, idx, symbol, allowed) => {
+            if(!allowed) return;
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if(!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            if(state.board[idx] !== '') return; // Already taken
+            
+            state.board[idx] = symbol;
+            state.turn = symbol === 'X' ? 'O' : 'X';
+            
+            // Check win
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            if(wins.some(c => state.board[c[0]] && state.board[c[0]] === state.board[c[1]] && state.board[c[0]] === state.board[c[2]])) {
+                state.winner = symbol;
+            } else if(!state.board.includes('')) {
+                state.winner = 'DRAW';
+            }
+            
+            await updateDoc(ref, { state: state });
+        };
+
+        // HANGMAN LOGIC
+        window.hangmanGuess = async (id, letter) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if(!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+
+            if(state.guesses.includes(letter)) return;
+            state.guesses.push(letter);
+            
+            if(!state.word.includes(letter)) {
+                state.mistakes++;
+            }
+            
+            await updateDoc(ref, { state: state });
+        };
+        
+        // NIEUW: PESTEN LOGIC
+        window.pestenStartGame = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists() || !snap.data().guest) return;
+            let data = snap.data();
+            let state = data.state;
+            
+            if (state.status !== 'waiting_start') return;
+
+            // Roep de globale initializeDeck aan
+            const fullDeck = window.initializeDeck ? window.initializeDeck() : []; 
+            if (fullDeck.length < 15) { // Minimaal 15 kaarten nodig
+                console.error("Deck te klein of niet geladen.");
+                return;
+            }
+            state.deck = fullDeck;
+            state.hostHand = state.deck.splice(0, 7);
+            state.guestHand = state.deck.splice(0, 7);
+
+            // Speel eerste kaart
+            let firstCard = state.deck.splice(0, 1)[0];
+            state.discardPile.push(firstCard);
+            state.status = 'playing';
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenPlayCard = async (id, card, index) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+
+            const topCard = state.discardPile[state.discardPile.length - 1];
+            const cardRank = card.replace(/[♥♦♣♠]/, '');
+            const topRank = topCard.replace(/[♥♦♣♠]/, '');
+            const cardSuit = card.slice(-1);
+            const topSuit = topCard.slice(-1);
+
+            // Simplified Playability Check (Match Rank or Suit, or Special Card)
+            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+
+            if (!canPlay) { return; } // Should not happen if button is disabled correctly
+
+            // Move card from hand to discard pile
+            state.discardPile.push(card);
+            removeCard(state[myRole + 'Hand'], card);
+            
+            // Check for win
+            if (state[myRole + 'Hand'].length === 0) {
+                state.winner = myRole;
+                state.status = 'finished';
+            } else {
+                // Change turn (simplified)
+                state.turn = opponentRole;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenDrawCard = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+            if (state.deck.length === 0) return;
+
+            const drawnCard = state.deck.splice(0, 1)[0];
+            state[myRole + 'Hand'].push(drawnCard);
+
+            // Turn change is MANDATORY after drawing
+            state.turn = opponentRole;
+
+            await updateDoc(ref, { state: state });
+        };
+
+        // NIEUW: DICE LOGIC
+        window.diceRoll = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+            
+            if (state.turn !== myRole || state.winner) return;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            state[myRole + 'Roll'] = roll;
+            
+            // Check for winner if both have rolled
+            if (state.hostRoll !== null && state.guestRoll !== null) {
+                if (state.hostRoll > state.guestRoll) {
+                    state.winner = 'host';
+                    state.message = `${data.host} wint met ${state.hostRoll} tegen ${state.guestRoll}!`;
+                } else if (state.guestRoll > state.hostRoll) {
+                    state.winner = 'guest';
+                    state.message = `${data.guest} wint met ${state.guestRoll} tegen ${state.hostRoll}!`;
+                } else {
+                    state.winner = 'DRAW';
+                    state.message = 'Gelijkspel, gooi opnieuw voor de volgende ronde!';
+                }
+            } else {
+                // Change turn
+                state.turn = opponentRole;
+                state.message = `Wachten op ${data[opponentRole]} om te gooien.`;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.diceNewRound = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+
+            // Reset rolls and winner, keeping current turn or switching turn for next game
+            state.hostRoll = null;
+            state.guestRoll = null;
+            state.winner = null;
+            state.turn = state.turn === 'host' ? 'guest' : 'host'; // Switch who starts the next round
+            state.message = `${data[state.turn]} begint de nieuwe ronde. Gooi nu!`;
+
+            await updateDoc(ref, { state: state });
+        };
     </script>
     
     <!-- EXTRA SCRIPT VOOR GAME LOGIC MET GETDOC (Import fix) -->
