@@ -434,14 +434,18 @@
         };
         
         function initializeDeck() {
+            // Pesten uses a standard 52-card deck (minus J, Q, K, A of each suit + 2 Jokers)
+            // No, Pesten usually uses 52 cards, but for simplicity and smaller hands:
+            // Let's use 32 cards (7 through Ace) + 2 Jokers.
             const suits = ['♥', '♦', '♣', '♠'];
-            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; // 2 is special
             let deck = [];
             for (const suit of suits) {
                 for (const rank of ranks) { deck.push(rank + suit); }
             }
             deck.push('Joker', 'Joker'); 
             
+            // Shuffle the deck (Fisher-Yates)
             for (let i = deck.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [deck[i], deck[j]] = [deck[j], deck[i]];
@@ -460,7 +464,8 @@
 
         function getInitialState(type) {
             if(type === 'tictactoe') return { board: Array(9).fill(''), turn: 'X', winner: null };
-            if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, setter: 'host', phase: 'setup' }; 
+            // AANGEPAST: Max mistakes van 6 naar 12
+            if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, maxMistakes: 12, setter: 'host', phase: 'setup' }; 
             
             if(type === 'pesten') return { 
                 turn: 'host', 
@@ -655,10 +660,12 @@
                 } else {
                     const wordDisplay = state.word.split('').map(l => state.guesses.includes(l) ? l : '_').join(' ');
                     const won = !wordDisplay.includes('_');
-                    const lost = state.mistakes >= 6;
+                    // AANGEPAST: Max mistakes is nu 12
+                    const lost = state.mistakes >= state.maxMistakes;
                     
                     html += `<div class="text-4xl font-mono tracking-widest mb-6">${wordDisplay}</div>`;
-                    html += `<div class="text-red-700 font-bold mb-4">Fouten: ${state.mistakes} / 6</div>`;
+                    // AANGEPAST: Max mistakes in display
+                    html += `<div class="text-red-700 font-bold mb-4">Fouten: ${state.mistakes} / ${state.maxMistakes}</div>`;
 
                     if(won || lost) {
                          const msg = won ? (isSetter ? "Ze hebben het geraden!" : "Je hebt gewonnen!") : (isSetter ? "Ze zijn opgehangen! Jij wint." : `Verloren! Het woord was ${state.word}`);
@@ -724,6 +731,10 @@
                          const cardRank = card.replace(/[♥♦♣♠]/, '');
                          const cardSuit = card.slice(-1);
                          
+                         // Fix: De pesten regels. Je mag spelen als:
+                         // 1. Dezelfde rang (rank)
+                         // 2. Dezelfde soort (suit)
+                         // 3. De kaart is een 2 of een Joker (altijd speelbaar, specials)
                          const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
                          
                          const colorClass = cardSuit === '♥' || cardSuit === '♦' ? 'card-red' : 'card-black';
@@ -855,6 +866,8 @@
 
             let firstCard = state.deck.splice(0, 1)[0];
             state.discardPile.push(firstCard);
+            // Bepaal wie begint op basis van de eerste kaart
+            state.turn = 'host'; // Host begint standaard, kan later door '2' worden gewijzigd
             state.status = 'playing';
 
             await updateDoc(ref, { state: state });
@@ -865,7 +878,7 @@
             const snap = await getDoc(ref);
             if (!snap.exists()) return;
             const data = snap.data();
-            const state = data.state;
+            let state = data.state; // Gebruik let om state aan te passen
             
             const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
             const opponentRole = myRole === 'host' ? 'guest' : 'host';
@@ -878,18 +891,30 @@
             const cardSuit = card.slice(-1);
             const topSuit = topCard.slice(-1);
 
+            // Regels: Dezelfde rang, dezelfde soort, 2 of Joker
             const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
 
             if (!canPlay) { return; } 
 
+            // Kaart is geldig: speel de kaart
             state.discardPile.push(card);
             removeCard(state[myRole + 'Hand'], card);
             
+            let nextTurn = opponentRole;
+
+            // SPECIALS (uitgebreide regels voor Pesten, bijv. 2 en Joker)
+            // 2: Forceer de volgende speler om 2 kaarten te pakken (wordt genegeerd in deze simpele implementatie, maar we geven de beurt wel door)
+
+            // WINNAAR CHECK
             if (state[myRole + 'Hand'].length === 0) {
                 state.winner = myRole;
                 state.status = 'finished';
-            } else {
-                state.turn = opponentRole;
+                nextTurn = null; // Stopt de beurtwisseling
+            } 
+            
+            // BEURT WISSELEN
+            if (nextTurn) {
+                state.turn = nextTurn;
             }
 
             await updateDoc(ref, { state: state });
@@ -900,7 +925,7 @@
             const snap = await getDoc(ref);
             if (!snap.exists()) return;
             const data = snap.data();
-            const state = data.state;
+            let state = data.state; // Gebruik let
             
             const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
             const opponentRole = myRole === 'host' ? 'guest' : 'host';
@@ -908,9 +933,11 @@
             if (state.turn !== myRole || state.status !== 'playing') return;
             if (state.deck.length === 0) return;
 
+            // Pak 1 kaart
             const drawnCard = state.deck.splice(0, 1)[0];
             state[myRole + 'Hand'].push(drawnCard);
 
+            // Geef de beurt door na het pakken
             state.turn = opponentRole;
 
             await updateDoc(ref, { state: state });
