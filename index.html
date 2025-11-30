@@ -144,18 +144,18 @@
             display: none;
             flex-direction: column;
             justify-content: flex-end; /* Barman staat onderaan */
-            align-items: flex-end; /* AANGEPAST: Lijn rechts uit */
-            padding-bottom: 0; /* AANGEPAST: Geen padding, positie via transform */
-            padding-right: 20px; /* NIEUW: Ruimte aan de rechterkant */
-            z-index: 110; /* Hoger dan GAME MODAL */
+            align-items: center; /* AANGEPAST: Lijn horizontaal in het midden uit */
+            padding-bottom: 0; 
+            padding-right: 0; /* AANGEPAST: Geen padding rechts */
+            z-index: 110; 
         }
 
         .barman-cutout {
-            width: 300px;
+            width: 400px; /* AANGEPAST: Maak de barman groter */
             height: auto;
             position: relative;
             margin-bottom: 0;
-            transform: translateY(15%); /* AANGEPAST: Duw 15% naar beneden buiten beeld */
+            transform: translateY(15%); /* Duw 15% naar beneden buiten beeld */
             z-index: 101;
         }
         .barman-cutout img {
@@ -172,24 +172,24 @@
             position: relative;
             max-width: 400px;
             min-width: 300px;
-            margin-bottom: -10px; /* Breng dichter bij de barman */
+            margin-bottom: -10px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             text-align: left;
             border: 2px solid #5d4037;
-            align-self: flex-end; /* AANGEPAST: Zorg dat de wolk rechts uitlijnt */
+            align-self: center; /* AANGEPAST: Centreer de wolk boven de barman */
         }
 
         .speech-bubble::after {
             content: '';
             position: absolute;
             bottom: -20px;
-            left: 80%; /* AANGEPAST: Verplaats de pijl naar rechtsboven om naar de barman te wijzen */
+            left: 50%; /* AANGEPAST: Centreer de pijl onder de wolk */
             width: 0;
             height: 0;
             border: 10px solid transparent;
             border-top-color: #ffffff;
             border-bottom: 0;
-            margin-left: -20px; /* Aangepaste margin */
+            margin-left: -10px; /* Herstel margin voor centrering */
         }
 
 
@@ -201,7 +201,7 @@
             .area-menu { order: 1; }
             .area-games { order: 2; }
             .area-chat { order: 3; }
-            .barman-cutout { width: 200px; }
+            .barman-cutout { width: 300px; } /* Behoud een redelijke grootte op mobiel */
             .speech-bubble { max-width: 90%; }
         }
     </style>
