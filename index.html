@@ -172,7 +172,8 @@
             position: relative;
             max-width: 400px;
             min-width: 300px;
-            margin-bottom: -10px; /* AANGEPAST: Minder marge om de wolk dichter bij de barman te brengen */
+            /* NIEUW: Grote negatieve marge om de wolk lager te plaatsen, net boven de barman */
+            margin-bottom: -150px; 
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             text-align: left;
             border: 2px solid #5d4037;
@@ -202,7 +203,7 @@
             .area-games { order: 2; }
             .area-chat { order: 3; }
             .barman-cutout { width: 300px; } /* Behoud een redelijke grootte op mobiel */
-            .speech-bubble { max-width: 90%; }
+            .speech-bubble { max-width: 90%; margin-bottom: 20px; } /* Terug naar normale marge op mobiel */
         }
     </style>
 </head>
