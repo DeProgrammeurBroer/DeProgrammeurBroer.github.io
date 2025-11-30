@@ -144,8 +144,9 @@
             display: none;
             flex-direction: column;
             justify-content: flex-end; /* Barman staat onderaan */
-            align-items: center;
-            padding-bottom: 5vh;
+            align-items: flex-end; /* AANGEPAST: Lijn rechts uit */
+            padding-bottom: 0; /* AANGEPAST: Geen padding, positie via transform */
+            padding-right: 20px; /* NIEUW: Ruimte aan de rechterkant */
             z-index: 110; /* Hoger dan GAME MODAL */
         }
 
@@ -153,7 +154,8 @@
             width: 300px;
             height: auto;
             position: relative;
-            margin-bottom: -10px;
+            margin-bottom: 0;
+            transform: translateY(15%); /* AANGEPAST: Duw 15% naar beneden buiten beeld */
             z-index: 101;
         }
         .barman-cutout img {
@@ -170,23 +172,24 @@
             position: relative;
             max-width: 400px;
             min-width: 300px;
-            margin-bottom: 20px;
+            margin-bottom: -10px; /* Breng dichter bij de barman */
             box-shadow: 0 4px 15px rgba(0,0,0,0.5);
             text-align: left;
             border: 2px solid #5d4037;
+            align-self: flex-end; /* AANGEPAST: Zorg dat de wolk rechts uitlijnt */
         }
 
         .speech-bubble::after {
             content: '';
             position: absolute;
             bottom: -20px;
-            left: 50%;
+            left: 80%; /* AANGEPAST: Verplaats de pijl naar rechtsboven om naar de barman te wijzen */
             width: 0;
             height: 0;
             border: 10px solid transparent;
             border-top-color: #ffffff;
             border-bottom: 0;
-            margin-left: -10px;
+            margin-left: -20px; /* Aangepaste margin */
         }
 
 
