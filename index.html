@@ -146,6 +146,7 @@
             justify-content: flex-end; /* Barman staat onderaan */
             align-items: center;
             padding-bottom: 5vh;
+            z-index: 110; /* Hoger dan GAME MODAL */
         }
 
         .barman-cutout {
@@ -296,10 +297,11 @@
     </div>
 
     <!-- FIREBASE LOGIC -->
+    <!-- Alle logica is nu in één blok geplaatst om module-volgorde problemen op te lossen -->
     <script type="module">
         import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
         import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js';
-        import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp, orderBy, updateDoc, doc, deleteDoc, setDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
+        import { getFirestore, collection, addDoc, onSnapshot, query, serverTimestamp, orderBy, updateDoc, doc, deleteDoc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
 
         // 1. CONFIG
         const firebaseConfig = {
@@ -323,79 +325,70 @@
         let activeGameListener = null;
         let currentGameId = null;
 
-        // Controleer op opgeslagen naam en toon de barman indien nodig
-        if (!myUsername) {
-            document.getElementById('barman-modal').style.display = 'flex';
-        } else {
-            // Start Auth als de naam al bekend is
-            initAuth();
-        }
+        // --- AUTHENTICATIE & START FUNCTIES ---
+
+        const initAuth = async () => {
+            if (!myUsername) return;
+            try {
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    try { 
+                        await signInWithCustomToken(auth, __initial_auth_token); 
+                        return; 
+                    } catch(e){
+                        // Token mismatch, val terug op anonieme login
+                    }
+                }
+                await signInAnonymously(auth);
+            } catch (err) { console.error("Auth failed", err); }
+        };
+
+        const startTavern = () => {
+            // Pas de globale myUsername aan als de naam is ingevoerd
+            myUsername = localStorage.getItem('tavern_username'); 
+            if (myUsername) {
+                // Verberg de barman, toon de UI
+                document.getElementById('barman-modal').style.display = 'none';
+                initAuth(); // Start inloggen
+            }
+        };
+
+
+        // --- EERSTE BEZOEKER FLOW ---
 
         // Event listener voor het Naam-formulier
         document.getElementById('name-form').addEventListener('submit', (e) => {
             e.preventDefault();
             const inputElement = document.getElementById('visitor-name-input');
-            const name = inputElement.value.trim().substring(0, 20); // Beperk lengte
+            const name = inputElement.value.trim().substring(0, 20); 
             if (name) {
                 localStorage.setItem('tavern_username', name);
-                myUsername = name;
-                document.getElementById('barman-modal').style.display = 'none';
-                initAuth(); // Start auth nadat de naam is ingesteld
+                startTavern(); // Start de herberg
             }
         });
 
-
-        // Helper function (was missing before, caused bugs)
-        window.isMyGame = function(g) {
-            if(!currentUser) return false;
-            return g.hostUid === currentUser.uid || g.guestUid === currentUser.uid;
-        };
-        
-        // --- NEW HELPER: PESTEN DECK INITIALIZATION ---
-        function initializeDeck() {
-            const suits = ['♥', '♦', '♣', '♠'];
-            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
-            let deck = [];
-            for (const suit of suits) {
-                for (const rank of ranks) { deck.push(rank + suit); }
-            }
-            // Voeg twee jokers toe
-            deck.push('Joker', 'Joker'); 
-            
-            // Schud de kaarten
-            for (let i = deck.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [deck[i], deck[j]] = [deck[j], deck[i]];
-            }
-            return deck;
+        // Controleer bij het laden of de naam al bekend is
+        if (!myUsername) {
+            document.getElementById('barman-modal').style.display = 'flex';
+        } else {
+            startTavern();
         }
 
-        // 2. AUTHENTICATION
-        const initAuth = async () => {
-            if (!myUsername) {
-                // Als naam nog niet is ingesteld, niet inloggen
-                return;
-            }
-            try {
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    try { await signInWithCustomToken(auth, __initial_auth_token); return; } catch(e){}
-                }
-                await signInAnonymously(auth);
-            } catch (err) { console.error("Auth failed", err); }
-        };
-        // initAuth() wordt nu aangeroepen na de naamcontrole.
-
+        // --- AUTH STATE CHANGE (Wordt alleen getriggerd na initAuth) ---
         onAuthStateChanged(auth, (user) => {
             if(user) {
                 currentUser = user;
-                // Gebruik de opgeslagen of ingevoerde naam
                 document.getElementById('user-status').innerText = `Ingelogd als: ${myUsername}`; 
                 setupChat();
                 setupGamesList();
+            } else {
+                // Optioneel: toon een "niet ingelogd" status
+                document.getElementById('user-status').innerText = `Status: Verbinding verbroken`; 
             }
         });
 
-        // 3. CHAT LOGIC
+
+        // --- CHAT LOGIC ---
+
         function setupChat() {
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'chat'));
             onSnapshot(q, (snap) => {
@@ -428,41 +421,54 @@
             }
         });
 
-        // 4. MULTIPLAYER LOBBY LOGIC
-        window.hostGame = async (type) => {
-            if(!currentUser) return alert("Even geduld, verbinden...");
-            
-            // Maak een nieuwe game doc
-            const gameData = {
-                type: type,
-                host: myUsername,
-                hostUid: currentUser.uid,
-                status: 'waiting', // waiting, playing, finished
-                timestamp: serverTimestamp(),
-                state: getInitialState(type)
-            };
 
-            const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'games'), gameData);
-            openGameUI(docRef.id, type, 'host');
+        // --- GAME UTILITIES ---
+        
+        window.isMyGame = function(g) {
+            if(!currentUser) return false;
+            return g.hostUid === currentUser.uid || g.guestUid === currentUser.uid;
         };
+        
+        function initializeDeck() {
+            const suits = ['♥', '♦', '♣', '♠'];
+            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2'];
+            let deck = [];
+            for (const suit of suits) {
+                for (const rank of ranks) { deck.push(rank + suit); }
+            }
+            deck.push('Joker', 'Joker'); 
+            
+            for (let i = deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [deck[i], deck[j]] = [deck[j], deck[i]];
+            }
+            return deck;
+        }
+
+        function removeCard(hand, cardToRemove) {
+            const index = hand.indexOf(cardToRemove);
+            if (index > -1) {
+                hand.splice(index, 1);
+                return true;
+            }
+            return false;
+        }
 
         function getInitialState(type) {
             if(type === 'tictactoe') return { board: Array(9).fill(''), turn: 'X', winner: null };
-            if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, setter: 'host', phase: 'setup' }; // phase: setup or guessing
+            if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, setter: 'host', phase: 'setup' }; 
             
-            // NIEUW: PESTEN
             if(type === 'pesten') return { 
-                turn: 'host', // host starts
-                deck: [], // Wordt gevuld bij start
+                turn: 'host', 
+                deck: [], 
                 hostHand: [], 
                 guestHand: [], 
                 discardPile: [],
-                status: 'waiting_start' // waiting_start, playing, finished
+                status: 'waiting_start' 
             };
             
-            // NIEUW: DOBBELEN
             if(type === 'dice') return { 
-                turn: 'host', // host starts
+                turn: 'host', 
                 hostRoll: null, 
                 guestRoll: null, 
                 winner: null,
@@ -471,6 +477,8 @@
 
             return {};
         }
+        
+        // --- GAME LOBBY LOGIC ---
 
         function setupGamesList() {
             const q = query(collection(db, 'artifacts', appId, 'public', 'data', 'games'));
@@ -479,7 +487,6 @@
                 const games = [];
                 snap.forEach(d => games.push({id: d.id, ...d.data()}));
                 
-                // Filter: alleen wachtende spellen en recente actieve spellen tonen
                 const activeGames = games.filter(g => g.status === 'waiting' || (g.status === 'playing' && window.isMyGame(g)));
                 
                 if(activeGames.length === 0) {
@@ -502,7 +509,6 @@
                     const btnClass = isMine ? 'opacity-50 cursor-default' : 'hover:bg-amber-700';
                     const action = isMine ? '' : `onclick="joinGame('${g.id}')"`;
                     
-                    // Als ik al in dit spel zit en het is playing, toon "Hervatten"
                     if(g.status === 'playing' && (g.hostUid === currentUser.uid || g.guestUid === currentUser.uid)) {
                         return `<div class="game-card">
                             <span>${icon} vs ${g.host}</span>
@@ -522,6 +528,22 @@
             });
         }
 
+        window.hostGame = async (type) => {
+            if(!currentUser) return alert("Even geduld, verbinden...");
+            
+            const gameData = {
+                type: type,
+                host: myUsername,
+                hostUid: currentUser.uid,
+                status: 'waiting', 
+                timestamp: serverTimestamp(),
+                state: getInitialState(type)
+            };
+
+            const docRef = await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'games'), gameData);
+            openGameUI(docRef.id, type, 'host');
+        };
+
         window.joinGame = async (gameId) => {
             const gameRef = doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId);
             await updateDoc(gameRef, {
@@ -534,12 +556,11 @@
 
         window.rejoinGame = (id, type) => openGameUI(id, type, 'player');
 
-        // 5. GAME PLAY UI
-        
-        // Functie voor als gebruiker zelf op 'Sluiten' klikt
+
+        // --- GAME PLAY UI & ACTIONS ---
+
         window.userQuitGame = async () => {
             if(currentGameId) {
-                // Verwijder game uit DB zodat hij offline gaat voor iedereen
                 try {
                     await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', currentGameId));
                 } catch(e) { console.log("Game al weg of error", e); }
@@ -549,7 +570,7 @@
 
         window.closeGameModal = () => {
             document.getElementById('game-modal').style.display = 'none';
-            if(activeGameListener) activeGameListener(); // Unsubscribe
+            if(activeGameListener) activeGameListener(); 
             activeGameListener = null;
             currentGameId = null;
         };
@@ -562,7 +583,6 @@
             stage.innerHTML = '<div class="text-2xl animate-pulse">Spel laden...</div>';
 
             activeGameListener = onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'games', gameId), (docSnap) => {
-                // Als document verwijderd is (door userQuitGame van iemand)
                 if(!docSnap.exists()) {
                     stage.innerHTML = "<div class='text-red-800 font-bold text-xl'>Tafel is gesloten.</div>";
                     setTimeout(closeGameModal, 2000);
@@ -577,7 +597,6 @@
             const stage = document.getElementById('game-stage');
             const amIHost = game.hostUid === currentUser.uid;
             
-            // Header
             let gameTitle = game.type === 'tictactoe' ? 'Boter, Kaas & Eieren' : game.type === 'hangman' ? 'Galgje' : game.type === 'pesten' ? 'Pesten' : 'Dobbelen';
             let html = `<h2 class="text-3xl tavern-font mb-4 text-amber-900">${gameTitle}</h2>`;
             html += `<div class="mb-4 text-amber-800">Spelers: <b>${game.host}</b> vs <b>${game.guest || 'Wachten...'}</b></div>`;
@@ -630,7 +649,6 @@
                         html += `<p class="animate-pulse">Tegenstander bedenkt een woord...</p>`;
                     }
                 } else {
-                    // Guessing Phase
                     const wordDisplay = state.word.split('').map(l => state.guesses.includes(l) ? l : '_').join(' ');
                     const won = !wordDisplay.includes('_');
                     const lost = state.mistakes >= 6;
@@ -643,7 +661,6 @@
                          html += `<div class="text-2xl font-bold mb-4">${msg}</div>`;
                          html += `<button onclick="userQuitGame()" class="tavern-btn px-6 py-2 mx-auto rounded">Sluit Spel</button>`;
                     } else if (!isSetter) {
-                        // Keyboard for guesser
                         const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split('');
                         html += `<div class="flex flex-wrap gap-1 justify-center max-w-md mx-auto">`;
                         alphabet.forEach(letter => {
@@ -661,7 +678,7 @@
                 }
             }
             
-            // --- NIEUW: PESTEN RENDER ---
+            // --- PESTEN RENDER ---
             else if(game.type === 'pesten') {
                 const state = game.state;
                 const myRole = amIHost ? 'host' : 'guest';
@@ -703,7 +720,6 @@
                          const cardRank = card.replace(/[♥♦♣♠]/, '');
                          const cardSuit = card.slice(-1);
                          
-                         // Simplified Playability Check
                          const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
                          
                          const colorClass = cardSuit === '♥' || cardSuit === '♦' ? 'card-red' : 'card-black';
@@ -725,7 +741,7 @@
                 }
             }
 
-            // --- NIEUW: DOBBELEN RENDER ---
+            // --- DOBBELEN RENDER ---
             else if(game.type === 'dice') {
                 const state = game.state;
                 const myRole = amIHost ? 'host' : 'guest';
@@ -763,15 +779,31 @@
             stage.innerHTML = html;
         }
 
-        // --- GAME ACTIONS ---
+        // --- GAME ACTIONS IMPLEMENTATIES ---
         
-        // Tic Tac Toe Move
-        window.tttMove = async (gameId, index, symbol, allowed) => {
+        window.tttMove = async (id, idx, symbol, allowed) => {
             if(!allowed) return;
-            // Note: Handled in separate script block due to module/scope, see below
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if(!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            if(state.board[idx] !== '') return; 
+            
+            state.board[idx] = symbol;
+            state.turn = symbol === 'X' ? 'O' : 'X';
+            
+            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+            if(wins.some(c => state.board[c[0]] && state.board[c[0]] === state.board[c[1]] && state.board[c[0]] === state.board[c[2]])) {
+                state.winner = symbol;
+            } else if(!state.board.includes('')) {
+                state.winner = 'DRAW';
+            }
+            
+            await updateDoc(ref, { state: state });
         };
-        
-        // Hangman Actions
+
         window.hangmanSetWord = async (id) => {
             const word = document.getElementById('hangman-word').value.toUpperCase().trim();
             if(word.length < 2) return alert("Te kort!");
@@ -783,453 +815,156 @@
         };
 
         window.hangmanGuess = async (id, letter) => {
-             // Handled in separate script block
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if(!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+
+            if(state.guesses.includes(letter)) return;
+            state.guesses.push(letter);
+            
+            if(!state.word.includes(letter)) {
+                state.mistakes++;
+            }
+            
+            await updateDoc(ref, { state: state });
         };
         
-        window.deleteGame = async (id) => {
-             await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'games', id));
-             closeGameModal();
+        window.pestenStartGame = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists() || !snap.data().guest) return;
+            let data = snap.data();
+            let state = data.state;
+            
+            if (state.status !== 'waiting_start') return;
+
+            const fullDeck = initializeDeck(); 
+            if (fullDeck.length < 15) { 
+                console.error("Deck te klein of niet geladen.");
+                return;
+            }
+            state.deck = fullDeck;
+            state.hostHand = state.deck.splice(0, 7);
+            state.guestHand = state.deck.splice(0, 7);
+
+            let firstCard = state.deck.splice(0, 1)[0];
+            state.discardPile.push(firstCard);
+            state.status = 'playing';
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenPlayCard = async (id, card, index) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+
+            const topCard = state.discardPile[state.discardPile.length - 1];
+            const cardRank = card.replace(/[♥♦♣♠]/, '');
+            const topRank = topCard.replace(/[♥♦♣♠]/, '');
+            const cardSuit = card.slice(-1);
+            const topSuit = topCard.slice(-1);
+
+            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+
+            if (!canPlay) { return; } 
+
+            state.discardPile.push(card);
+            removeCard(state[myRole + 'Hand'], card);
+            
+            if (state[myRole + 'Hand'].length === 0) {
+                state.winner = myRole;
+                state.status = 'finished';
+            } else {
+                state.turn = opponentRole;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.pestenDrawCard = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+
+            if (state.turn !== myRole || state.status !== 'playing') return;
+            if (state.deck.length === 0) return;
+
+            const drawnCard = state.deck.splice(0, 1)[0];
+            state[myRole + 'Hand'].push(drawnCard);
+
+            state.turn = opponentRole;
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.diceRoll = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+            
+            const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
+            const opponentRole = myRole === 'host' ? 'guest' : 'host';
+            
+            if (state.turn !== myRole || state.winner) return;
+
+            const roll = Math.floor(Math.random() * 6) + 1;
+            state[myRole + 'Roll'] = roll;
+            
+            if (state.hostRoll !== null && state.guestRoll !== null) {
+                if (state.hostRoll > state.guestRoll) {
+                    state.winner = 'host';
+                    state.message = `${data.host} wint met ${state.hostRoll} tegen ${state.guestRoll}!`;
+                } else if (state.guestRoll > state.hostRoll) {
+                    state.winner = 'guest';
+                    state.message = `${data.guest} wint met ${state.guestRoll} tegen ${state.hostRoll}!`;
+                } else {
+                    state.winner = 'DRAW';
+                    state.message = 'Gelijkspel, gooi opnieuw voor de volgende ronde!';
+                }
+            } else {
+                state.turn = opponentRole;
+                state.message = `Wachten op ${data[opponentRole]} om te gooien.`;
+            }
+
+            await updateDoc(ref, { state: state });
+        };
+
+        window.diceNewRound = async (id) => {
+            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
+            const snap = await getDoc(ref);
+            if (!snap.exists()) return;
+            const data = snap.data();
+            const state = data.state;
+
+            state.hostRoll = null;
+            state.guestRoll = null;
+            state.winner = null;
+            state.turn = state.turn === 'host' ? 'guest' : 'host'; 
+            state.message = `${data[state.turn]} begint de nieuwe ronde. Gooi nu!`;
+
+            await updateDoc(ref, { state: state });
         };
 
         function escape(s) {
             return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
         }
-    </script>
-    
-    <!-- EXTRA SCRIPT VOOR GAME LOGIC MET GETDOC (Import fix) -->
-    <script type="module">
-        import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'; // <-- TOEGEVOEGD
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
-            authDomain: "manonopeenrij.firebaseapp.com",
-            projectId: "manonopeenrij",
-            storageBucket: "manonopeenrij.firebasestorage.app",
-            messagingSenderId: "575065794428",
-            appId: "1:575065794428:web:78a68f77a426f7daf3e6f9",
-            measurementId: "G-ERGHXY3LR7"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
-        const auth = getAuth(app); // <-- TOEGEVOEGD
-        
-        // Pesten helper om kaart te verwijderen
-        function removeCard(hand, cardToRemove) {
-            const index = hand.indexOf(cardToRemove);
-            if (index > -1) {
-                hand.splice(index, 1);
-                return true;
-            }
-            return false;
-        }
-
-        // TTT LOGIC
-        window.tttMove = async (id, idx, symbol, allowed) => {
-            if(!allowed) return;
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if(!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            if(state.board[idx] !== '') return; // Already taken
-            
-            state.board[idx] = symbol;
-            state.turn = symbol === 'X' ? 'O' : 'X';
-            
-            // Check win
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            if(wins.some(c => state.board[c[0]] && state.board[c[0]] === state.board[c[1]] && state.board[c[0]] === state.board[c[2]])) {
-                state.winner = symbol;
-            } else if(!state.board.includes('')) {
-                state.winner = 'DRAW';
-            }
-            
-            await updateDoc(ref, { state: state });
-        };
-
-        // HANGMAN LOGIC
-        window.hangmanGuess = async (id, letter) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if(!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-
-            if(state.guesses.includes(letter)) return;
-            state.guesses.push(letter);
-            
-            if(!state.word.includes(letter)) {
-                state.mistakes++;
-            }
-            
-            await updateDoc(ref, { state: state });
-        };
-        
-        // NIEUW: PESTEN LOGIC
-        window.pestenStartGame = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists() || !snap.data().guest) return;
-            let data = snap.data();
-            let state = data.state;
-            
-            if (state.status !== 'waiting_start') return;
-
-            // Roep de globale initializeDeck aan
-            const fullDeck = window.initializeDeck ? window.initializeDeck() : []; 
-            if (fullDeck.length < 15) { // Minimaal 15 kaarten nodig
-                console.error("Deck te klein of niet geladen.");
-                return;
-            }
-            state.deck = fullDeck;
-            state.hostHand = state.deck.splice(0, 7);
-            state.guestHand = state.deck.splice(0, 7);
-
-            // Speel eerste kaart
-            let firstCard = state.deck.splice(0, 1)[0];
-            state.discardPile.push(firstCard);
-            state.status = 'playing';
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.pestenPlayCard = async (id, card, index) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-
-            if (state.turn !== myRole || state.status !== 'playing') return;
-
-            const topCard = state.discardPile[state.discardPile.length - 1];
-            const cardRank = card.replace(/[♥♦♣♠]/, '');
-            const topRank = topCard.replace(/[♥♦♣♠]/, '');
-            const cardSuit = card.slice(-1);
-            const topSuit = topCard.slice(-1);
-
-            // Simplified Playability Check (Match Rank or Suit, or Special Card)
-            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
-
-            if (!canPlay) { return; } // Should not happen if button is disabled correctly
-
-            // Move card from hand to discard pile
-            state.discardPile.push(card);
-            removeCard(state[myRole + 'Hand'], card);
-            
-            // Check for win
-            if (state[myRole + 'Hand'].length === 0) {
-                state.winner = myRole;
-                state.status = 'finished';
-            } else {
-                // Change turn (simplified)
-                state.turn = opponentRole;
-            }
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.pestenDrawCard = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-
-            if (state.turn !== myRole || state.status !== 'playing') return;
-            if (state.deck.length === 0) return;
-
-            const drawnCard = state.deck.splice(0, 1)[0];
-            state[myRole + 'Hand'].push(drawnCard);
-
-            // Turn change is MANDATORY after drawing
-            state.turn = opponentRole;
-
-            await updateDoc(ref, { state: state });
-        };
-
-        // NIEUW: DICE LOGIC
-        window.diceRoll = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-            
-            if (state.turn !== myRole || state.winner) return;
-
-            const roll = Math.floor(Math.random() * 6) + 1;
-            state[myRole + 'Roll'] = roll;
-            
-            // Check for winner if both have rolled
-            if (state.hostRoll !== null && state.guestRoll !== null) {
-                if (state.hostRoll > state.guestRoll) {
-                    state.winner = 'host';
-                    state.message = `${data.host} wint met ${state.hostRoll} tegen ${state.guestRoll}!`;
-                } else if (state.guestRoll > state.hostRoll) {
-                    state.winner = 'guest';
-                    state.message = `${data.guest} wint met ${state.guestRoll} tegen ${state.hostRoll}!`;
-                } else {
-                    state.winner = 'DRAW';
-                    state.message = 'Gelijkspel, gooi opnieuw voor de volgende ronde!';
-                }
-            } else {
-                // Change turn
-                state.turn = opponentRole;
-                state.message = `Wachten op ${data[opponentRole]} om te gooien.`;
-            }
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.diceNewRound = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-
-            // Reset rolls and winner, keeping current turn or switching turn for next game
-            state.hostRoll = null;
-            state.guestRoll = null;
-            state.winner = null;
-            state.turn = state.turn === 'host' ? 'guest' : 'host'; // Switch who starts the next round
-            state.message = `${data[state.turn]} begint de nieuwe ronde. Gooi nu!`;
-
-            await updateDoc(ref, { state: state });
-        };
-    </script>
-    
-    <!-- EXTRA SCRIPT VOOR GAME LOGIC MET GETDOC (Import fix) -->
-    <script type="module">
-        import { getFirestore, doc, getDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js';
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js';
-        import { getAuth } from 'https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js'; // <-- TOEGEVOEGD
-        
-        const firebaseConfig = {
-            apiKey: "AIzaSyBrJytboOjIzpTFHDLBrDlDrF8vIkJyqJ4",
-            authDomain: "manonopeenrij.firebaseapp.com",
-            projectId: "manonopeenrij",
-            storageBucket: "manonopeenrij.firebasestorage.app",
-            messagingSenderId: "575065794428",
-            appId: "1:575065794428:web:78a68f77a426f7daf3e6f9",
-            measurementId: "G-ERGHXY3LR7"
-        };
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        
-        const auth = getAuth(app); // <-- TOEGEVOEGD
-        
-        // Pesten helper om kaart te verwijderen
-        function removeCard(hand, cardToRemove) {
-            const index = hand.indexOf(cardToRemove);
-            if (index > -1) {
-                hand.splice(index, 1);
-                return true;
-            }
-            return false;
-        }
-
-        // TTT LOGIC
-        window.tttMove = async (id, idx, symbol, allowed) => {
-            if(!allowed) return;
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if(!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            if(state.board[idx] !== '') return; // Already taken
-            
-            state.board[idx] = symbol;
-            state.turn = symbol === 'X' ? 'O' : 'X';
-            
-            // Check win
-            const wins = [[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
-            if(wins.some(c => state.board[c[0]] && state.board[c[0]] === state.board[c[1]] && state.board[c[0]] === state.board[c[2]])) {
-                state.winner = symbol;
-            } else if(!state.board.includes('')) {
-                state.winner = 'DRAW';
-            }
-            
-            await updateDoc(ref, { state: state });
-        };
-
-        // HANGMAN LOGIC
-        window.hangmanGuess = async (id, letter) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if(!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-
-            if(state.guesses.includes(letter)) return;
-            state.guesses.push(letter);
-            
-            if(!state.word.includes(letter)) {
-                state.mistakes++;
-            }
-            
-            await updateDoc(ref, { state: state });
-        };
-        
-        // NIEUW: PESTEN LOGIC
-        window.pestenStartGame = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists() || !snap.data().guest) return;
-            let data = snap.data();
-            let state = data.state;
-            
-            if (state.status !== 'waiting_start') return;
-
-            // Roep de globale initializeDeck aan
-            const fullDeck = window.initializeDeck ? window.initializeDeck() : []; 
-            if (fullDeck.length < 15) { // Minimaal 15 kaarten nodig
-                console.error("Deck te klein of niet geladen.");
-                return;
-            }
-            state.deck = fullDeck;
-            state.hostHand = state.deck.splice(0, 7);
-            state.guestHand = state.deck.splice(0, 7);
-
-            // Speel eerste kaart
-            let firstCard = state.deck.splice(0, 1)[0];
-            state.discardPile.push(firstCard);
-            state.status = 'playing';
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.pestenPlayCard = async (id, card, index) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-
-            if (state.turn !== myRole || state.status !== 'playing') return;
-
-            const topCard = state.discardPile[state.discardPile.length - 1];
-            const cardRank = card.replace(/[♥♦♣♠]/, '');
-            const topRank = topCard.replace(/[♥♦♣♠]/, '');
-            const cardSuit = card.slice(-1);
-            const topSuit = topCard.slice(-1);
-
-            // Simplified Playability Check (Match Rank or Suit, or Special Card)
-            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
-
-            if (!canPlay) { return; } // Should not happen if button is disabled correctly
-
-            // Move card from hand to discard pile
-            state.discardPile.push(card);
-            removeCard(state[myRole + 'Hand'], card);
-            
-            // Check for win
-            if (state[myRole + 'Hand'].length === 0) {
-                state.winner = myRole;
-                state.status = 'finished';
-            } else {
-                // Change turn (simplified)
-                state.turn = opponentRole;
-            }
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.pestenDrawCard = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-
-            if (state.turn !== myRole || state.status !== 'playing') return;
-            if (state.deck.length === 0) return;
-
-            const drawnCard = state.deck.splice(0, 1)[0];
-            state[myRole + 'Hand'].push(drawnCard);
-
-            // Turn change is MANDATORY after drawing
-            state.turn = opponentRole;
-
-            await updateDoc(ref, { state: state });
-        };
-
-        // NIEUW: DICE LOGIC
-        window.diceRoll = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-            
-            const myRole = data.hostUid === auth.currentUser.uid ? 'host' : 'guest';
-            const opponentRole = myRole === 'host' ? 'guest' : 'host';
-            
-            if (state.turn !== myRole || state.winner) return;
-
-            const roll = Math.floor(Math.random() * 6) + 1;
-            state[myRole + 'Roll'] = roll;
-            
-            // Check for winner if both have rolled
-            if (state.hostRoll !== null && state.guestRoll !== null) {
-                if (state.hostRoll > state.guestRoll) {
-                    state.winner = 'host';
-                    state.message = `${data.host} wint met ${state.hostRoll} tegen ${state.guestRoll}!`;
-                } else if (state.guestRoll > state.hostRoll) {
-                    state.winner = 'guest';
-                    state.message = `${data.guest} wint met ${state.guestRoll} tegen ${state.hostRoll}!`;
-                } else {
-                    state.winner = 'DRAW';
-                    state.message = 'Gelijkspel, gooi opnieuw voor de volgende ronde!';
-                }
-            } else {
-                // Change turn
-                state.turn = opponentRole;
-                state.message = `Wachten op ${data[opponentRole]} om te gooien.`;
-            }
-
-            await updateDoc(ref, { state: state });
-        };
-
-        window.diceNewRound = async (id) => {
-            const ref = doc(db, 'artifacts', appId, 'public', 'data', 'games', id);
-            const snap = await getDoc(ref);
-            if (!snap.exists()) return;
-            const data = snap.data();
-            const state = data.state;
-
-            // Reset rolls and winner, keeping current turn or switching turn for next game
-            state.hostRoll = null;
-            state.guestRoll = null;
-            state.winner = null;
-            state.turn = state.turn === 'host' ? 'guest' : 'host'; // Switch who starts the next round
-            state.message = `${data[state.turn]} begint de nieuwe ronde. Gooi nu!`;
-
-            await updateDoc(ref, { state: state });
-        };
     </script>
 </body>
 </html>
