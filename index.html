@@ -137,6 +137,58 @@
         .card-black { color: black; }
 
 
+        /* --- BARMAN MODAL STIJL (NIEUW) --- */
+        #barman-modal {
+            background: rgba(0,0,0,0.4);
+            backdrop-filter: blur(5px);
+            display: none;
+            flex-direction: column;
+            justify-content: flex-end; /* Barman staat onderaan */
+            align-items: center;
+            padding-bottom: 5vh;
+        }
+
+        .barman-cutout {
+            width: 300px;
+            height: auto;
+            position: relative;
+            margin-bottom: -10px;
+            z-index: 101;
+        }
+        .barman-cutout img {
+            width: 100%;
+            object-fit: contain;
+            /* Placeholder URL voor een barman */
+            content: url('https://placehold.co/300x500/2c1810/f4e4bc?text=Barman');
+        }
+
+        .speech-bubble {
+            background: #ffffff;
+            border-radius: 1rem;
+            padding: 1.5rem;
+            position: relative;
+            max-width: 400px;
+            min-width: 300px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            text-align: left;
+            border: 2px solid #5d4037;
+        }
+
+        .speech-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -20px;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border: 10px solid transparent;
+            border-top-color: #ffffff;
+            border-bottom: 0;
+            margin-left: -10px;
+        }
+
+
         /* Responsive */
         @media (max-width: 1000px) {
             .tavern-grid { grid-template-columns: 1fr; max-width: 600px; }
@@ -145,10 +197,29 @@
             .area-menu { order: 1; }
             .area-games { order: 2; }
             .area-chat { order: 3; }
+            .barman-cutout { width: 200px; }
+            .speech-bubble { max-width: 90%; }
         }
     </style>
 </head>
 <body>
+
+    <!-- BARMAN WELKOM MODAL (NIEUW) -->
+    <div id="barman-modal" class="modal-overlay" style="display: none;">
+        <div class="speech-bubble">
+            <p class="text-xl font-bold text-amber-900 mb-4 tavern-font">Welkom in De Oude Herberg!</p>
+            <p class="text-gray-700 mb-4">Ga zitten, reiziger. Wat is jouw naam?</p>
+            <form id="name-form" class="flex flex-col gap-3">
+                <input type="text" id="visitor-name-input" class="p-2 border-2 border-amber-900 rounded" placeholder="Typ hier uw naam" required maxlength="20">
+                <button type="submit" class="tavern-btn rounded py-2">Binnenkomen</button>
+            </form>
+        </div>
+        <div class="barman-cutout">
+            <!-- Gebruik barman.png, met een placeholder als fallback -->
+            <img src="barman.png" alt="Herberg Barman" onerror="this.onerror=null; this.src='https://placehold.co/300x500/2c1810/f4e4bc?text=Barman+Cutout'">
+        </div>
+    </div>
+
 
     <!-- AMBIENT MUSIC (Muziek start automatisch en herhaalt) -->
     <audio id="ambient-music" src="muziek.mp3" autoplay loop></audio>
@@ -248,10 +319,31 @@
         
         // Globals
         let currentUser = null;
-        let myUsername = localStorage.getItem('tavern_username') || ('Gast ' + Math.floor(Math.random()*1000));
-        localStorage.setItem('tavern_username', myUsername);
+        let myUsername = localStorage.getItem('tavern_username');
         let activeGameListener = null;
         let currentGameId = null;
+
+        // Controleer op opgeslagen naam en toon de barman indien nodig
+        if (!myUsername) {
+            document.getElementById('barman-modal').style.display = 'flex';
+        } else {
+            // Start Auth als de naam al bekend is
+            initAuth();
+        }
+
+        // Event listener voor het Naam-formulier
+        document.getElementById('name-form').addEventListener('submit', (e) => {
+            e.preventDefault();
+            const inputElement = document.getElementById('visitor-name-input');
+            const name = inputElement.value.trim().substring(0, 20); // Beperk lengte
+            if (name) {
+                localStorage.setItem('tavern_username', name);
+                myUsername = name;
+                document.getElementById('barman-modal').style.display = 'none';
+                initAuth(); // Start auth nadat de naam is ingesteld
+            }
+        });
+
 
         // Helper function (was missing before, caused bugs)
         window.isMyGame = function(g) {
@@ -280,6 +372,10 @@
 
         // 2. AUTHENTICATION
         const initAuth = async () => {
+            if (!myUsername) {
+                // Als naam nog niet is ingesteld, niet inloggen
+                return;
+            }
             try {
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     try { await signInWithCustomToken(auth, __initial_auth_token); return; } catch(e){}
@@ -287,12 +383,13 @@
                 await signInAnonymously(auth);
             } catch (err) { console.error("Auth failed", err); }
         };
-        initAuth();
+        // initAuth() wordt nu aangeroepen na de naamcontrole.
 
         onAuthStateChanged(auth, (user) => {
             if(user) {
                 currentUser = user;
-                document.getElementById('user-status').innerText = `Ingelogd als: ${myUsername}`;
+                // Gebruik de opgeslagen of ingevoerde naam
+                document.getElementById('user-status').innerText = `Ingelogd als: ${myUsername}`; 
                 setupChat();
                 setupGamesList();
             }
