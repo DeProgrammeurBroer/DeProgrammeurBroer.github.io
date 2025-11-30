@@ -434,11 +434,9 @@
         };
         
         function initializeDeck() {
-            // Pesten uses a standard 52-card deck (minus J, Q, K, A of each suit + 2 Jokers)
-            // No, Pesten usually uses 52 cards, but for simplicity and smaller hands:
-            // Let's use 32 cards (7 through Ace) + 2 Jokers.
+            // Pesten uses 32 cards (7 through Ace) + 2 Jokers for simplicity
             const suits = ['♥', '♦', '♣', '♠'];
-            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; // 2 is special
+            const ranks = ['7', '8', '9', '10', 'J', 'Q', 'K', 'A', '2']; 
             let deck = [];
             for (const suit of suits) {
                 for (const rank of ranks) { deck.push(rank + suit); }
@@ -462,13 +460,25 @@
             return false;
         }
 
+        /**
+         * Hulpfunctie om rang en soort uit een kaartstring te halen
+         * @param {string} card
+         * @returns {{rank: string, suit: string|null}}
+         */
+        function getCardParts(card) {
+            if (card === 'Joker') return { rank: 'Joker', suit: null };
+            const rank = card.slice(0, -1);
+            const suit = card.slice(-1);
+            return { rank, suit };
+        }
+
         function getInitialState(type) {
             if(type === 'tictactoe') return { board: Array(9).fill(''), turn: 'X', winner: null };
-            // AANGEPAST: Max mistakes van 6 naar 12
+            // Max mistakes is 12
             if(type === 'hangman') return { word: '', guesses: [], mistakes: 0, maxMistakes: 12, setter: 'host', phase: 'setup' }; 
             
             if(type === 'pesten') return { 
-                turn: 'host', 
+                turn: 'host', // Placeholder, wordt gerandomiseerd bij start
                 deck: [], 
                 hostHand: [], 
                 guestHand: [], 
@@ -660,11 +670,9 @@
                 } else {
                     const wordDisplay = state.word.split('').map(l => state.guesses.includes(l) ? l : '_').join(' ');
                     const won = !wordDisplay.includes('_');
-                    // AANGEPAST: Max mistakes is nu 12
                     const lost = state.mistakes >= state.maxMistakes;
                     
                     html += `<div class="text-4xl font-mono tracking-widest mb-6">${wordDisplay}</div>`;
-                    // AANGEPAST: Max mistakes in display
                     html += `<div class="text-red-700 font-bold mb-4">Fouten: ${state.mistakes} / ${state.maxMistakes}</div>`;
 
                     if(won || lost) {
@@ -698,8 +706,9 @@
                 const myHand = state[myRole + 'Hand'];
                 const opponentHandSize = state[opponentRole + 'Hand'] ? state[opponentRole + 'Hand'].length : 0;
                 const topCard = state.discardPile.length > 0 ? state.discardPile[state.discardPile.length - 1] : 'Geen';
-                const topRank = topCard.replace(/[♥♦♣♠]/, '');
-                const topSuit = topCard.slice(-1);
+                
+                // Haal de rang en soort van de bovenste kaart op met helper
+                const { rank: topRank, suit: topSuit } = getCardParts(topCard);
 
                 if (state.status === 'waiting_start') {
                     html += `<p class="mb-4">Wachten op een tegenstander om te starten...</p>`;
@@ -728,15 +737,23 @@
                     html += `<h3 class="font-bold mb-2">Jouw Kaarten:</h3>`;
                     html += `<div class="flex flex-wrap justify-center gap-2 mb-4">`;
                     myHand.forEach((card, index) => {
-                         const cardRank = card.replace(/[♥♦♣♠]/, '');
-                         const cardSuit = card.slice(-1);
+                         const { rank: cardRank, suit: cardSuit } = getCardParts(card);
                          
-                         // Fix: De pesten regels. Je mag spelen als:
-                         // 1. Dezelfde rang (rank)
-                         // 2. Dezelfde soort (suit)
-                         // 3. De kaart is een 2 of een Joker (altijd speelbaar, specials)
-                         const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+                         // Check speelbaarheid (zelfde logica als in pestenPlayCard)
+                         const isJoker = cardRank === 'Joker';
+                         const isTwo = cardRank === '2';
+                         let canPlay = isJoker || isTwo; 
                          
+                         if (!canPlay && topCard !== 'Geen') {
+                             if (topRank === 'Joker') {
+                                 // Na een Joker mag je elke kaart spelen (vereenvoudigd)
+                                 canPlay = true; 
+                             } else {
+                                 // Check rang of soort match
+                                 canPlay = (cardRank === topRank) || (cardSuit === topSuit);
+                             }
+                         }
+
                          const colorClass = cardSuit === '♥' || cardSuit === '♦' ? 'card-red' : 'card-black';
                          const enabledClass = isMyTurn && canPlay ? 'bg-white hover:bg-green-100 cursor-pointer' : 'bg-gray-300 opacity-70 cursor-not-allowed';
 
@@ -855,19 +872,33 @@
             
             if (state.status !== 'waiting_start') return;
 
-            const fullDeck = initializeDeck(); 
+            let fullDeck = initializeDeck(); 
             if (fullDeck.length < 15) { 
                 console.error("Deck te klein of niet geladen.");
                 return;
             }
+            
             state.deck = fullDeck;
             state.hostHand = state.deck.splice(0, 7);
             state.guestHand = state.deck.splice(0, 7);
 
             let firstCard = state.deck.splice(0, 1)[0];
+
+            // FIX: Zorg dat de eerste kaart geen speciale kaart (2 of Joker) is
+            while (firstCard === 'Joker' || firstCard.includes('2')) {
+                state.deck.push(firstCard); // Speciale kaart terug in de pot
+                // Shuffle the deck again (simpele herschikking)
+                for (let i = state.deck.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [state.deck[i], state.deck[j]] = [state.deck[j], state.deck[i]];
+                }
+                firstCard = state.deck.splice(0, 1)[0]; // Trek nieuwe kaart
+            }
+
             state.discardPile.push(firstCard);
-            // Bepaal wie begint op basis van de eerste kaart
-            state.turn = 'host'; // Host begint standaard, kan later door '2' worden gewijzigd
+            
+            // FIX: Randomiseer de startspeler
+            state.turn = Math.random() < 0.5 ? 'host' : 'guest'; 
             state.status = 'playing';
 
             await updateDoc(ref, { state: state });
@@ -878,7 +909,7 @@
             const snap = await getDoc(ref);
             if (!snap.exists()) return;
             const data = snap.data();
-            let state = data.state; // Gebruik let om state aan te passen
+            let state = data.state; 
             
             const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
             const opponentRole = myRole === 'host' ? 'guest' : 'host';
@@ -886,13 +917,25 @@
             if (state.turn !== myRole || state.status !== 'playing') return;
 
             const topCard = state.discardPile[state.discardPile.length - 1];
-            const cardRank = card.replace(/[♥♦♣♠]/, '');
-            const topRank = topCard.replace(/[♥♦♣♠]/, '');
-            const cardSuit = card.slice(-1);
-            const topSuit = topCard.slice(-1);
+            
+            // Gebruik de helper functie om rang en soort op te halen
+            const { rank: cardRank, suit: cardSuit } = getCardParts(card);
+            const { rank: topRank, suit: topSuit } = getCardParts(topCard);
 
-            // Regels: Dezelfde rang, dezelfde soort, 2 of Joker
-            const canPlay = cardRank === topRank || cardSuit === topSuit || cardRank === 'Joker' || cardRank === '2';
+            // FIX: Verbeterde speelvalidatie
+            const isJoker = cardRank === 'Joker';
+            const isTwo = cardRank === '2';
+            let canPlay = isJoker || isTwo; // Joker en 2 zijn altijd speelbaar
+
+            if (!canPlay) {
+                if (topRank === 'Joker') {
+                    // Als de bovenste kaart een Joker is, mag elke niet-speciale kaart gespeeld worden
+                    canPlay = true; 
+                } else {
+                    // Check rang of soort match
+                    canPlay = (cardRank === topRank) || (cardSuit === topSuit);
+                }
+            }
 
             if (!canPlay) { return; } 
 
@@ -902,14 +945,14 @@
             
             let nextTurn = opponentRole;
 
-            // SPECIALS (uitgebreide regels voor Pesten, bijv. 2 en Joker)
-            // 2: Forceer de volgende speler om 2 kaarten te pakken (wordt genegeerd in deze simpele implementatie, maar we geven de beurt wel door)
-
+            // Hier komt de logica voor de speciale kaarten (bijv. 2, Joker, etc.)
+            // Nu alleen beurtwisseling (geen actie-effecten in deze simpele versie)
+            
             // WINNAAR CHECK
             if (state[myRole + 'Hand'].length === 0) {
                 state.winner = myRole;
                 state.status = 'finished';
-                nextTurn = null; // Stopt de beurtwisseling
+                nextTurn = null; 
             } 
             
             // BEURT WISSELEN
@@ -925,7 +968,7 @@
             const snap = await getDoc(ref);
             if (!snap.exists()) return;
             const data = snap.data();
-            let state = data.state; // Gebruik let
+            let state = data.state; 
             
             const myRole = data.hostUid === currentUser.uid ? 'host' : 'guest';
             const opponentRole = myRole === 'host' ? 'guest' : 'host';
